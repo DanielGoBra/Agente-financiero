@@ -1,0 +1,6 @@
+{
+  "name": "Extractor Comercial (Micro y PYMES)",
+  "description": "Agente buscador de negocios locales (Itagüí, San Antonio de Prado, Caldas, La Estrella). Utiliza Google Maps Places API y Gemini para filtrar y evaluar confiabilidad de negocios para otorgamiento de créditos financieros.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
