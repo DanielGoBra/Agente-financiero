@@ -1,5 +1,6 @@
 import * as XLSX from "xlsx";
 import { ValidatedBusiness } from "../types";
+import { translateTypes } from "./typeTranslations";
 
 export function exportToExcel(data: ValidatedBusiness[], filename = "negocios_extraidos.xlsx") {
   // Format data for Excel
@@ -14,12 +15,19 @@ export function exportToExcel(data: ValidatedBusiness[], filename = "negocios_ex
       "Dirección": b.address,
       "Municipio": b.municipality,
       "Sitio Web": b.website || "No disponible",
-      "Categorías": b.types.map(t => t.replace(/_/g, ' ')).join(", "),
+      "Categorías": translateTypes(b.types),
       "Calificación": b.rating || "N/A",
       "Número de Reseñas": b.userRatingsTotal || 0,
       "Estado": estado,
       "Es Micro/PYME": b.isMicroSME ? "Sí" : "No",
-      "Confiabilidad (1-10)": b.reliabilityScore
+      "Confiabilidad Datos (1-10)": b.reliabilityScore,
+      "Score Oportunidad (%)": b.opportunityScore,
+      "Tamaño Estimado": b.estimatedSize,
+      "Necesidad Financiera": b.predictedNeed,
+      "Huella Digital": b.digitalFootprint,
+      "Estado CRM": b.crmStatus ? b.crmStatus.toUpperCase() : "NUEVO",
+      "Notas del Asesor": b.userNotes || "",
+      "Descripción del Negocio": b.reasoning
     };
   });
 
@@ -29,7 +37,7 @@ export function exportToExcel(data: ValidatedBusiness[], filename = "negocios_ex
   const workbook = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(workbook, worksheet, "Negocios");
   
-  // Set some column widths
+  // Set column widths
   worksheet["!cols"] = [
     { wch: 30 }, // Nombre
     { wch: 15 }, // Teléfono
@@ -41,8 +49,16 @@ export function exportToExcel(data: ValidatedBusiness[], filename = "negocios_ex
     { wch: 18 }, // Reseñas
     { wch: 15 }, // Estado
     { wch: 15 }, // Es Micro/PYME
-    { wch: 20 }  // Confiabilidad
+    { wch: 25 }, // Confiabilidad Datos
+    { wch: 20 }, // Score Oportunidad
+    { wch: 18 }, // Tamaño Estimado
+    { wch: 25 }, // Necesidad Financiera
+    { wch: 15 }, // Huella Digital
+    { wch: 15 }, // Estado CRM
+    { wch: 35 }, // Notas
+    { wch: 40 }  // Razonamiento
   ];
 
   XLSX.writeFile(workbook, filename);
 }
+
