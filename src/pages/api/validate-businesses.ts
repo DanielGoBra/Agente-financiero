@@ -43,7 +43,12 @@ const businessValidationSchema: Schema = {
   }
 };
 
-export const POST: APIRoute = async ({ request }) => {
+export const POST: APIRoute = async (context) => {
+  const { request } = context;
+  const getEnv = (key: string) => {
+    return (context.locals as any)?.runtime?.env?.[key] || process.env[key] || '';
+  };
+
   try {
     const { businesses } = await request.json();
     
@@ -65,9 +70,9 @@ export const POST: APIRoute = async ({ request }) => {
     let success = false;
     let lastError: any = null;
 
-    // Check if OpenRouter is configured in .env
-    const openrouterKey = process.env.OPENROUTER_API_KEY;
-    const openrouterModel = process.env.OPENROUTER_MODEL || "meta-llama/llama-3.1-8b-instruct:free";
+    // Check if OpenRouter is configured
+    const openrouterKey = getEnv('OPENROUTER_API_KEY');
+    const openrouterModel = getEnv('OPENROUTER_MODEL') || "meta-llama/llama-3.1-8b-instruct:free";
 
     if (openrouterKey && openrouterKey !== "YOUR_OPENROUTER_API_KEY" && openrouterKey !== "") {
       try {
@@ -175,7 +180,7 @@ ${JSON.stringify(businesses.map((b: any) => ({
     // Fallback to Gemini if OpenRouter is not set or fails
     if (!success) {
       const ai = new GoogleGenAI({ 
-        apiKey: process.env.GEMINI_API_KEY,
+        apiKey: getEnv('GEMINI_API_KEY'),
         httpOptions: {
           headers: {
             'User-Agent': 'aistudio-build',
