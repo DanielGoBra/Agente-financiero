@@ -6,12 +6,5 @@
 		"nodejs_compat"
 	],
 	"name": "agente-financiero",
-	"main": "@astrojs/cloudflare/entrypoints/server",
-	"assets": {
-		"directory": "./dist",
-		"binding": "ASSETS"
-	},
-	"observability": {
-		"enabled": true
-	}
+	"pages_build_output_dir": "./dist"
 }
