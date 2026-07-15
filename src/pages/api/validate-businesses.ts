@@ -1,5 +1,6 @@
 import type { APIRoute } from 'astro';
 import { GoogleGenAI, Type, Schema } from "@google/genai";
+import { env } from 'cloudflare:workers';
 
 const businessValidationSchema: Schema = {
   type: Type.ARRAY,
@@ -43,17 +44,9 @@ const businessValidationSchema: Schema = {
   }
 };
 
-export const POST: APIRoute = async (context) => {
-  const { request } = context;
-  const getEnv = (key: string) => {
-    const cfEnv = (context.locals as any)?.runtime?.env?.[key];
-    if (cfEnv) return cfEnv;
-    const globalEnv = (globalThis as any)[key];
-    if (globalEnv) return globalEnv;
-    if (typeof process !== 'undefined' && process.env) {
-      return process.env[key] || '';
-    }
-    return '';
+export const POST: APIRoute = async ({ request }) => {
+  const getEnv = (key: string): string => {
+    return (env as any)[key] || '';
   };
 
   try {
