@@ -5,6 +5,5 @@
 		"global_fetch_strictly_public",
 		"nodejs_compat"
 	],
-	"name": "agente-financiero",
-	"pages_build_output_dir": "./dist"
+	"name": "agente-financiero"
 }
