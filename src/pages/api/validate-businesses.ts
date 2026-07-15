@@ -179,8 +179,12 @@ ${JSON.stringify(businesses.map((b: any) => ({
 
     // Fallback to Gemini if OpenRouter is not set or fails
     if (!success) {
+      const geminiKey = getEnv('GEMINI_API_KEY');
+      if (!geminiKey) {
+        throw new Error('No hay API keys configuradas. Configura OPENROUTER_API_KEY o GEMINI_API_KEY como secrets en Cloudflare Workers.');
+      }
       const ai = new GoogleGenAI({ 
-        apiKey: getEnv('GEMINI_API_KEY'),
+        apiKey: geminiKey,
         httpOptions: {
           headers: {
             'User-Agent': 'aistudio-build',
