@@ -125,12 +125,13 @@ ${JSON.stringify(businesses.map((b: any) => ({
   address: b.address
 })), null, 2)}`;
 
+        console.log(`OpenRouter key present: ${!!openrouterKey}, length: ${openrouterKey.length}`);
         const orResponse = await fetch("https://openrouter.ai/api/v1/chat/completions", {
           method: "POST",
           headers: {
             "Authorization": `Bearer ${openrouterKey}`,
             "Content-Type": "application/json",
-            "HTTP-Referer": "http://localhost:4321",
+            "HTTP-Referer": "https://agente-financiero.danelgomez-mgvc.workers.dev",
             "X-Title": "Agente Financiero PYME"
           },
           body: JSON.stringify({
@@ -145,7 +146,9 @@ ${JSON.stringify(businesses.map((b: any) => ({
         });
 
         if (!orResponse.ok) {
-          throw new Error(`OpenRouter API error: ${orResponse.statusText} (${orResponse.status})`);
+          const errorBody = await orResponse.text();
+          console.error(`OpenRouter error response: ${errorBody}`);
+          throw new Error(`OpenRouter API error: ${orResponse.status} - ${errorBody}`);
         }
 
         const orData = await orResponse.json();
@@ -173,7 +176,7 @@ ${JSON.stringify(businesses.map((b: any) => ({
         }
       } catch (err: any) {
         lastError = err;
-        console.warn(`Fallo en OpenRouter, recurriendo a Gemini:`, err.message || err);
+        console.error(`Fallo en OpenRouter:`, err.message || err);
       }
     }
 
@@ -280,7 +283,11 @@ ${JSON.stringify(businesses.map((b: any) => ({
 
   } catch (error: any) {
     console.error("Error validating businesses:", error);
-    return new Response(JSON.stringify({ error: error.message || "Failed to validate businesses" }), {
+    return new Response(JSON.stringify({ 
+      error: error.message || "Failed to validate businesses",
+      provider: 'none',
+      hint: 'Verifica que OPENROUTER_API_KEY o GEMINI_API_KEY estén configuradas como secrets en Cloudflare Workers'
+    }), {
       status: 500,
       headers: { 'Content-Type': 'application/json' }
     });
