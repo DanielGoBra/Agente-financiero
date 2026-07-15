@@ -13,7 +13,6 @@ import { LeadCRM } from "./LeadCRM";
 import { Dashboard } from "./Dashboard";
 import AdminPanel from "./AdminPanel";
 import { databaseService, isDemoActive } from "../lib/supabase";
-import { getApiUrl } from "../lib/api";
 
 // Predefined ZONES for Antioquia Sur (quick shortcuts)
 const PRESETS = [
@@ -359,7 +358,7 @@ export function MapAgent({ currentUser, onLogout, onUserUpdate }: MapAgentProps)
         
         setStatusText(`Analizando lote ${currentBatch} de ${totalBatches}...`);
         
-        const valRes = await fetchWithRetry(getApiUrl("/api/validate-businesses"), {
+        const valRes = await fetchWithRetry("/api/validate-businesses", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ businesses: chunk })

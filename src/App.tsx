@@ -5,7 +5,6 @@ import { Login } from "./components/Login";
 import { initSupabase, authService } from "./lib/supabase";
 import { UserProfile } from "./types";
 import { Loader2, ShieldAlert } from "lucide-react";
-import { getApiUrl } from "./lib/api";
 
 export default function App() {
   const [apiKey, setApiKey] = useState<string | null>(null);
@@ -15,7 +14,7 @@ export default function App() {
 
   useEffect(() => {
     // Fetch Google Maps & Supabase keys dynamically from Astro API endpoint
-    fetch(getApiUrl("/api/config"))
+    fetch("/api/config")
       .then((res) => {
         if (!res.ok) throw new Error("Error en la conexión con el servidor.");
         return res.json();
