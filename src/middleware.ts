@@ -17,10 +17,13 @@ export const onRequest = defineMiddleware(async (context, next) => {
   // Get the response from the next middleware/route handler
   const response = await next();
 
-  // Set CORS headers on the response
-  response.headers.set('Access-Control-Allow-Origin', '*');
-  response.headers.set('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
-  response.headers.set('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  // Clone the response to avoid "Headers are immutable" errors on certain platforms/adapters
+  const newResponse = new Response(response.body, response);
 
-  return response;
+  // Set CORS headers safely
+  newResponse.headers.set('Access-Control-Allow-Origin', '*');
+  newResponse.headers.set('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+  newResponse.headers.set('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+
+  return newResponse;
 });
