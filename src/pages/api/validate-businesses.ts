@@ -46,7 +46,14 @@ const businessValidationSchema: Schema = {
 export const POST: APIRoute = async (context) => {
   const { request } = context;
   const getEnv = (key: string) => {
-    return (context.locals as any)?.runtime?.env?.[key] || process.env[key] || '';
+    const cfEnv = (context.locals as any)?.runtime?.env?.[key];
+    if (cfEnv) return cfEnv;
+    const globalEnv = (globalThis as any)[key];
+    if (globalEnv) return globalEnv;
+    if (typeof process !== 'undefined' && process.env) {
+      return process.env[key] || '';
+    }
+    return '';
   };
 
   try {

@@ -2,7 +2,14 @@ import type { APIRoute } from 'astro';
 
 export const GET: APIRoute = async (context) => {
   const getEnv = (key: string) => {
-    return (context.locals as any)?.runtime?.env?.[key] || process.env[key] || '';
+    const cfEnv = (context.locals as any)?.runtime?.env?.[key];
+    if (cfEnv) return cfEnv;
+    const globalEnv = (globalThis as any)[key];
+    if (globalEnv) return globalEnv;
+    if (typeof process !== 'undefined' && process.env) {
+      return process.env[key] || '';
+    }
+    return '';
   };
 
   const apiKey = getEnv('GOOGLE_MAPS_PLATFORM_KEY');
