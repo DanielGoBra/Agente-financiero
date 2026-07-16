@@ -13,7 +13,7 @@ import { MapVisualizer } from "./MapVisualizer";
 import { LeadCRM } from "./LeadCRM";
 import { Dashboard } from "./Dashboard";
 import AdminPanel from "./AdminPanel";
-import { databaseService, isDemoActive } from "../lib/supabase";
+import { authService, databaseService, isDemoActive } from "../lib/supabase";
 
 // Predefined ZONES for Antioquia Sur (quick shortcuts)
 const PRESETS = [
@@ -87,6 +87,29 @@ interface MapAgentProps {
   currentUser: UserProfile;
   onLogout: () => void;
   onUserUpdate: (user: UserProfile) => void;
+}
+
+interface BusinessValidation {
+  id: string;
+  isMicroSME: boolean;
+  reliabilityScore: number;
+  reasoning: string;
+  opportunityScore: number;
+  estimatedSize: "micro" | "small" | "medium";
+  predictedNeed: string;
+  digitalFootprint: "low" | "medium" | "high";
+}
+
+function getApiError(value: unknown): string | null {
+  if (typeof value !== "object" || value === null) return null;
+  const error = (value as Record<string, unknown>).error;
+  return typeof error === "string" ? error : null;
+}
+
+function getValidations(value: unknown): BusinessValidation[] | null {
+  if (typeof value !== "object" || value === null) return null;
+  const validations = (value as Record<string, unknown>).validations;
+  return Array.isArray(validations) ? validations as BusinessValidation[] : null;
 }
 
 export function MapAgent({ currentUser, onLogout, onUserUpdate }: MapAgentProps) {
@@ -395,6 +418,7 @@ export function MapAgent({ currentUser, onLogout, onUserUpdate }: MapAgentProps)
             const res = await fetch(url, options);
             if (res.ok) return res;
             console.warn(`Intento ${attempt}/${retries} falló con código ${res.status}.`);
+            if ([400, 401, 403, 413, 429].includes(res.status)) return res;
             if (attempt === retries) return res;
           } catch (err) {
             console.error(`Intento ${attempt}/${retries} falló por error de red:`, err);
@@ -406,8 +430,12 @@ export function MapAgent({ currentUser, onLogout, onUserUpdate }: MapAgentProps)
         throw new Error("No se pudo completar el análisis tras varios reintentos automáticos.");
       };
 
-      let validations: any[] = [];
+      let validations: BusinessValidation[] = [];
       const chunkSize = 100; // Consolidated to 100 to prevent 429 RPM rate limits on Free Tier
+      const accessToken = await authService.getAccessToken();
+      if (!accessToken) {
+        throw new Error("Tu sesión expiró. Inicia sesión nuevamente para continuar.");
+      }
 
       for (let i = 0; i < allExtracted.length; i += chunkSize) {
         const chunk = allExtracted.slice(i, i + chunkSize);
@@ -418,25 +446,32 @@ export function MapAgent({ currentUser, onLogout, onUserUpdate }: MapAgentProps)
         
         const valRes = await fetchWithRetry("/api/validate-businesses", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${accessToken}`,
+          },
           body: JSON.stringify({ businesses: chunk })
         });
 
         if (!valRes.ok) {
           const errText = await valRes.text();
-          let errData;
-          try { errData = JSON.parse(errText); } catch(e) {}
-          throw new Error(errData?.error || `Fallo en el servidor de IA (Código: ${valRes.status}). Reintenta.`);
+          let errorMessage: string | null = null;
+          try { errorMessage = getApiError(JSON.parse(errText) as unknown); } catch {}
+          throw new Error(errorMessage || `Fallo en el servidor de IA (Código: ${valRes.status}). Reintenta.`);
         }
 
-        const valData = await valRes.json();
-        validations = [...validations, ...valData.validations];
+        const valData = await valRes.json() as unknown;
+        const batchValidations = getValidations(valData);
+        if (!batchValidations) {
+          throw new Error("El servidor de IA devolvió una respuesta inválida.");
+        }
+        validations = [...validations, ...batchValidations];
       }
 
       setStatusText("Finalizando perfilamiento...");
       
       const mergedResults: ValidatedBusiness[] = allExtracted.map(ext => {
-        const aiAnalysis = validations.find((v: any) => v.id === ext.id);
+        const aiAnalysis = validations.find((validation) => validation.id === ext.id);
         return {
           ...ext,
           isMicroSME: aiAnalysis ? aiAnalysis.isMicroSME : true,

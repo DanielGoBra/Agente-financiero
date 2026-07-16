@@ -6,6 +6,20 @@ import { initSupabase, authService } from "./lib/supabase";
 import { UserProfile } from "./types";
 import { Loader2, ShieldAlert } from "lucide-react";
 
+interface PublicConfigResponse {
+  apiKey: string;
+  supabaseUrl: string;
+  supabaseAnonKey: string;
+}
+
+function isPublicConfigResponse(value: unknown): value is PublicConfigResponse {
+  if (typeof value !== "object" || value === null) return false;
+  const config = value as Record<string, unknown>;
+  return typeof config.apiKey === "string"
+    && typeof config.supabaseUrl === "string"
+    && typeof config.supabaseAnonKey === "string";
+}
+
 export default function App() {
   const [apiKey, setApiKey] = useState<string | null>(null);
   const [user, setUser] = useState<UserProfile | null>(null);
@@ -17,9 +31,12 @@ export default function App() {
     fetch("/api/config")
       .then((res) => {
         if (!res.ok) throw new Error("Error en la conexión con el servidor.");
-        return res.json();
+        return res.json() as Promise<unknown>;
       })
       .then(async (data) => {
+        if (!isPublicConfigResponse(data)) {
+          throw new Error("La configuración pública recibida no es válida.");
+        }
         if (data.apiKey && data.apiKey !== "YOUR_GOOGLE_MAPS_API_KEY" && data.apiKey !== "") {
           setApiKey(data.apiKey);
           
@@ -68,15 +85,15 @@ export default function App() {
           <h2 className="text-2xl font-bold text-white mb-3">Conexión requerida</h2>
           <div className="text-left text-slate-400 space-y-4 text-sm border-t border-slate-800/40 pt-4">
             <p className="leading-relaxed">
-              Para el correcto funcionamiento del localizador geográfico y del mapa interactivo, debes configurar tus API keys en el archivo <code className="bg-slate-950 px-1.5 py-0.5 rounded text-xs text-rose-400 font-mono border border-slate-800">.env</code> de la raíz del proyecto.
+              Para el correcto funcionamiento del localizador, configura las credenciales públicas de Maps y Supabase en el entorno del servicio.
             </p>
             <div className="bg-dark-0/70 p-4 rounded-xl border border-slate-800 font-mono text-xs text-slate-300 space-y-2">
-              <p># Configura estas variables en tu archivo .env:</p>
-              <p><span className="text-teal-400">GEMINI_API_KEY</span>="tu_api_key_de_gemini"</p>
-              <p><span className="text-teal-400">GOOGLE_MAPS_PLATFORM_KEY</span>="tu_api_key_de_google_maps"</p>
+              <p><span className="text-teal-400">GOOGLE_MAPS_PLATFORM_KEY</span></p>
+              <p><span className="text-teal-400">PUBLIC_SUPABASE_URL</span></p>
+              <p><span className="text-teal-400">PUBLIC_SUPABASE_ANON_KEY</span></p>
             </div>
             <p className="text-[11px] text-slate-500 italic">
-              * Nota: Una vez agregadas las claves en el archivo .env, reinicia el servidor de desarrollo para aplicar los cambios.
+              Usa únicamente una clave pública de Supabase; las claves secretas nunca deben llegar al navegador.
             </p>
           </div>
         </div>
@@ -93,8 +110,8 @@ export default function App() {
       <div className="h-screen w-full flex flex-col workspace-shell">
         <MapAgent 
           currentUser={user} 
-          onLogout={() => {
-            authService.signOut();
+          onLogout={async () => {
+            await authService.signOut();
             setUser(null);
           }} 
           onUserUpdate={setUser}

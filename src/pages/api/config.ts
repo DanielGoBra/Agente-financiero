@@ -1,28 +1,35 @@
 import type { APIRoute } from 'astro';
-import { env } from 'cloudflare:workers';
+import {
+  getRuntimeString,
+  getSupabasePublicConfig,
+  isBrowserSafeSupabaseKey,
+  jsonResponse,
+} from '../../lib/server/security';
 
 export const GET: APIRoute = async () => {
   try {
-    const apiKey = (env as any).GOOGLE_MAPS_PLATFORM_KEY || '';
-    const supabaseUrl = (env as any).PUBLIC_SUPABASE_URL || (env as any).SUPABASE_URL || '';
-    const supabaseAnonKey = (env as any).PUBLIC_SUPABASE_ANON_KEY || (env as any).SUPABASE_ANON_KEY || (env as any).SUPABASE_KEY || '';
+    const apiKey = getRuntimeString('GOOGLE_MAPS_PLATFORM_KEY');
+    const { url: supabaseUrl, key: supabaseAnonKey } = getSupabasePublicConfig();
 
-    return new Response(JSON.stringify({ 
+    if (!apiKey || !supabaseUrl || !supabaseAnonKey) {
+      return jsonResponse({ error: 'La configuración pública está incompleta.' }, 503);
+    }
+
+    if (!isBrowserSafeSupabaseKey(supabaseAnonKey)) {
+      console.error(JSON.stringify({ event: 'unsafe_supabase_key_blocked' }));
+      return jsonResponse({ error: 'La clave configurada para el navegador no es una clave pública de Supabase.' }, 503);
+    }
+
+    return jsonResponse({
       apiKey,
       supabaseUrl,
       supabaseAnonKey
-    }), {
-      status: 200,
-      headers: {
-        'Content-Type': 'application/json',
-      },
     });
-  } catch (err: any) {
-    return new Response(JSON.stringify({
-      error: err.message,
-    }), {
-      status: 500,
-      headers: { 'Content-Type': 'application/json' },
-    });
+  } catch (error) {
+    console.error(JSON.stringify({
+      event: 'public_config_error',
+      message: error instanceof Error ? error.message : 'unknown',
+    }));
+    return jsonResponse({ error: 'No se pudo cargar la configuración pública.' }, 500);
   }
 };

@@ -1,5 +1,7 @@
 -- SCRIPT DE CONFIGURACIÓN DE BASE DE DATOS EN SUPABASE
 -- Ejecuta este script en el editor SQL de tu panel de Supabase.
+-- IMPORTANTE: después de crear el esquema, ejecuta también
+-- supabase_security_hardening.sql para instalar las políticas de producción.
 
 -- =========================================================================
 -- 1. Tabla de Perfiles de Usuario (Profiles)

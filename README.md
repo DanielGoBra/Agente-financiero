@@ -1,20 +1,24 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://ai.google.dev/static/site-assets/images/share-ais-513315318.png" />
-</div>
+# Agente Financiero PYME
 
-# Run and deploy your AI Studio app
+Aplicación Astro + React desplegada en Cloudflare Workers. Usa Supabase para autenticación y datos, Google Maps Platform para búsqueda geográfica y OpenRouter para la clasificación de oportunidades.
 
-This contains everything you need to run your app locally.
+## Desarrollo local
 
-View your app in AI Studio: https://ai.studio/apps/970d5089-90d5-4a63-81c7-d4b9a062dd03
+1. Instala las dependencias con `npm install`.
+2. Copia `.env.example` a `.env` y configura valores locales.
+3. Inicia el proyecto con `npm run dev`.
 
-## Run Locally
+Nunca uses una clave `service_role` o `sb_secret` de Supabase en una variable pública. La aplicación valida este requisito antes de entregar configuración al navegador.
 
-**Prerequisites:**  Node.js
+## Producción
 
+Antes de desplegar cambios de seguridad, sigue [SECURITY.md](./SECURITY.md) y ejecuta `supabase_security_hardening.sql` en el editor SQL del proyecto Supabase.
 
-1. Install dependencies:
-   `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
-   `npm run dev`
+Validaciones recomendadas:
+
+```text
+npm run generate-types
+npm run lint
+npm run build
+npm audit --omit=dev
+```

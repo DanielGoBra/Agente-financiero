@@ -1,12 +1,24 @@
-import { createClient } from "@supabase/supabase-js";
+import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { UserProfile, ValidatedBusiness } from "../types";
 
-let supabaseClient: any = null;
+let supabaseClient: SupabaseClient | null = null;
+
+function inferDigitalFootprint(website: unknown, phone: unknown): ValidatedBusiness["digitalFootprint"] {
+  if (typeof website === "string" && website.trim()) return "high";
+  if (typeof phone === "string" && phone.trim()) return "medium";
+  return "low";
+}
 
 export function initSupabase(url: string, key: string) {
   if (url && url !== "" && key && key !== "") {
     try {
-      supabaseClient = createClient(url, key);
+      supabaseClient = createClient(url, key, {
+        auth: {
+          autoRefreshToken: true,
+          persistSession: true,
+          detectSessionInUrl: false,
+        },
+      });
       console.log("Supabase inicializado correctamente.");
     } catch (err) {
       console.error("Error al inicializar Supabase.", err);
@@ -98,6 +110,13 @@ export const authService = {
       role: profileData?.role || "asesor",
       assignedZones
     };
+  },
+
+  async getAccessToken(): Promise<string | null> {
+    if (!supabaseClient) return null;
+    const { data, error } = await supabaseClient.auth.getSession();
+    if (error) return null;
+    return data.session?.access_token || null;
   }
 };
 
@@ -155,6 +174,8 @@ export const databaseService = {
       opportunityScore: d.opportunity_score || 0,
       predictedNeed: d.predicted_need || "",
       reasoning: d.reasoning || "",
+      isMicroSME: true,
+      digitalFootprint: inferDigitalFootprint(d.email, d.telefonos),
       crmStatus: d.crm_status || "nuevo",
       userNotes: d.crm_notes || "",
       businessStatus: "OPERATIONAL",
@@ -190,6 +211,8 @@ export const databaseService = {
       opportunityScore: d.opportunity_score || 0,
       predictedNeed: d.predicted_need || "",
       reasoning: d.reasoning || "",
+      isMicroSME: true,
+      digitalFootprint: inferDigitalFootprint(d.email, d.telefonos),
       crmStatus: d.crm_status || null,
       userNotes: d.crm_notes || "",
       businessStatus: "OPERATIONAL",
