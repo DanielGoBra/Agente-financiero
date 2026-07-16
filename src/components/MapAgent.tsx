@@ -16,9 +16,38 @@ import { databaseService, isDemoActive } from "../lib/supabase";
 
 // Predefined ZONES for Antioquia Sur (quick shortcuts)
 const PRESETS = [
-  { id: "Envigado", name: "Envigado, Antioquia", subZonas: ["Centro", "El Dorado", "Alcalá", "San Marcos", "La Sebastiana", "Las Antillas", "Mesa"] },
-  { id: "Sabaneta", name: "Sabaneta, Antioquia", subZonas: ["Centro", "Aves María", "La Doctora", "Las Lomitas", "Aliadas", "San José"] },
-  { id: "Itagüí", name: "Itagüí, Antioquia", subZonas: ["Centro", "Santa María", "Ditaires", "Simón Bolívar", "San José", "La Independencia", "Zona Industrial", "Zona Comercial", "Sur", "Norte", "Parque Principal"] },
+  { id: "Sabaneta", name: "Sabaneta, Antioquia", subZonas: [
+    "Los Arias", "Maria Auxiliadora", "Villas del Carmen", "La Florida", "Los Alcázares",
+    "La Barquereña", "San Joaquín", "Betania", "Vegas de la Doctora", "Tres Esquinas",
+    "Prados de Sabaneta", "Nuestra Señora de Los Dolores", "Sabaneta Real", "Calle Larga",
+    "Holanda", "Entreamigos", "Calle del Banco", "Santa Ana", "Aliadas del Sur",
+    "Paso Ancho", "Restrepo Naranjo", "Manuel Restrepo", "Virgen del Carmen", "Las Casitas",
+    "San Rafael", "Promisión", "Playas de Maria", "El Carmelo II", "Ancón Sur", "Centro", "Aves María"
+  ]},
+  { id: "Itagüí", name: "Itagüí, Antioquia", subZonas: [
+    "Zona Industrial 1", "Zona Industrial 2", "La Independencia", "San Juan Bautista", "San José",
+    "Araucaria", "La Gloria", "Las Mercedes", "Centro", "Asturias", "Los Naranjos", "Villa Paula",
+    "Artex", "Playa Rica", "Satexco", "San Isidro", "La Santa Cruz", "Santa Catalina",
+    "Samaria", "La Finca", "Yarumito", "El Palmar", "Santa Ana", "Las Margaritas", "Malta",
+    "Glorieta Pilsen", "Monte Verde", "Camparola", "San Pio X", "La Palama",
+    "Jardines Montesacro", "Zona Industrial 3", "Las Brisas", "Pilsen", "San Javier",
+    "Villa Lia", "19 de Abril", "San Gabriel", "San Antonio", "Triana", "Ditaires",
+    "San Francisco", "Santa Maria 1", "Santa Maria 2", "Santa Maria 3",
+    "Colinas del Sur", "Central Mayorista", "San Fernando", "La Raya", "Simón Bolívar",
+    "Las Acacias", "Las Américas", "El Tablazo", "Calatrava", "Loma Linda", "Terranova",
+    "La Aldea", "Ferrara", "Balcones de Sevilla", "Fátima", "El Rosario", "La Unión",
+    "Santa Maria la Nueva", "Los Olivares", "El Pedregal", "El Progreso", "El Ajizal", "El Porvenir"
+  ]},
+  { id: "Envigado", name: "Envigado, Antioquia", subZonas: [
+    "Las Vegas", "El Portal", "San Marcos", "Pontevedra", "Jardines", "Villagrande",
+    "Bosques de Zúñiga", "Los Naranjos", "Mesa", "Zona Centro", "Obrero", "Bucarest",
+    "La Magnolia", "La Sebastiana", "Las Flores", "Uribe Ángel", "Alto de Misael",
+    "Las Orquídeas", "El Chinguí", "El Salado", "La Mina", "San Rafael", "San José",
+    "Las Antillas", "El Trianón", "Loma del Barro", "La Paz", "El Dorado", "Las Casitas",
+    "Primavera", "Milán", "Vallejuelos", "Alcalá", "Loma de Las Brujas", "La Pradera",
+    "El Chocho", "Inmaculada", "El Escobero", "Santa Catalina", "El Vallano",
+    "Las Palmas", "Pantanillo"
+  ]},
   { id: "San Antonio de Prado", name: "San Antonio de Prado, Medellín, Antioquia", subZonas: ["Parque Principal", "Barichara", "Limonar", "Pradito", "Centro", "El Vergel", "Naranjitos", "La Capilla"] },
   { id: "Caldas", name: "Caldas, Antioquia", subZonas: ["Centro", "La Inmaculada", "Mandalay", "La Locería", "Andalucía", "Zona Industrial", "Felipe", "Olaya"] },
   { id: "La Estrella", name: "La Estrella, Antioquia", subZonas: ["Parque Principal", "La Aldea", "Pueblo Viejo", "La Tablaza", "Centro", "Zona Industrial", "San Agustín"] }
@@ -97,6 +126,18 @@ export function MapAgent({ currentUser, onLogout, onUserUpdate }: MapAgentProps)
   const [selectedPreset, setSelectedPreset] = useState(
     userPresets.length > 0 ? userPresets[0].name : PRESETS[0].name
   );
+  // Barrio selector: search one specific neighborhood
+  const currentPresetZone = userPresets.find(z => z.name === selectedPreset) || PRESETS.find(z => z.name === selectedPreset);
+  const availableBarrios = currentPresetZone?.subZonas || [];
+  const [selectedBarrio, setSelectedBarrio] = useState(availableBarrios[0] || "");
+  
+  // Sync barrio when municipio changes
+  useEffect(() => {
+    const zone = userPresets.find(z => z.name === selectedPreset) || PRESETS.find(z => z.name === selectedPreset);
+    if (zone && zone.subZonas.length > 0) {
+      setSelectedBarrio(zone.subZonas[0]);
+    }
+  }, [selectedPreset]);
   // Portfolio clients loaded from DB
   const [dbClients, setDbClients] = useState<ValidatedBusiness[]>([]);
 
@@ -246,7 +287,13 @@ export function MapAgent({ currentUser, onLogout, onUserUpdate }: MapAgentProps)
         const presetZone = PRESETS.find(z => z.name === selectedPreset);
         if (presetZone) {
           locationQuery = presetZone.name;
-          subQueries = presetZone.subZonas.map(sz => `${activeKeyword} en ${sz}, ${presetZone.name.split(",")[0]}`);
+          const municipio = presetZone.name.split(",")[0];
+          // Search only in the selected barrio
+          subQueries = [
+            `${activeKeyword} en ${selectedBarrio}, ${municipio}`,
+            `${activeKeyword} cerca de ${selectedBarrio}, ${municipio}`,
+            `${activeKeyword} barrio ${selectedBarrio}, ${municipio}, Antioquia`
+          ];
         } else {
           locationQuery = selectedPreset;
           subQueries = [`${activeKeyword} en ${selectedPreset}`];
@@ -273,9 +320,12 @@ export function MapAgent({ currentUser, onLogout, onUserUpdate }: MapAgentProps)
 
       let allExtracted: ExtractedBusiness[] = [];
       const seenIds = new Set<string>();
+      const seenNameAddr = new Set<string>();
 
-      for (const query of subQueries) {
-        setStatusText(`Buscando "${activeKeyword}" en subzona: ${query.split(" en ")[1]}...`);
+      for (let qi = 0; qi < subQueries.length; qi++) {
+        const query = subQueries[qi];
+        const barrio = query.split(" en ")[1] || query;
+        setStatusText(`🔍 Barrio ${qi + 1}/${subQueries.length}: "${barrio}" — ${allExtracted.length} negocios únicos encontrados`);
         
         try {
           const response = await placesLib.Place.searchByText({
@@ -312,14 +362,21 @@ export function MapAgent({ currentUser, onLogout, onUserUpdate }: MapAgentProps)
             }));
 
             for (const b of extracted) {
-              if (!seenIds.has(b.id)) {
+              const nameAddrKey = `${b.name.toLowerCase().trim()}|${b.address.toLowerCase().trim()}`;
+              if (!seenIds.has(b.id) && !seenNameAddr.has(nameAddrKey)) {
                 seenIds.add(b.id);
+                seenNameAddr.add(nameAddrKey);
                 allExtracted.push(b);
               }
             }
           }
         } catch (e) {
           console.error("Error executing sub-query:", query, e);
+        }
+
+        // Small delay between requests to avoid rate limiting on Places API
+        if (qi < subQueries.length - 1) {
+          await new Promise(r => setTimeout(r, 200));
         }
       }
 
@@ -559,18 +616,37 @@ export function MapAgent({ currentUser, onLogout, onUserUpdate }: MapAgentProps)
 
                 <div className="font-sans">
                   {usePreset ? (
-                    <div className="space-y-1">
-                      <label className="text-[10px] text-slate-400 font-bold uppercase">Selecciona municipio</label>
-                      <select
-                        value={selectedPreset}
-                        onChange={(e) => setSelectedPreset(e.target.value)}
-                        disabled={isExtracting}
-                        className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2.5 text-xs text-slate-700 font-medium transition-all shadow-sm focus:outline-none focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 cursor-pointer"
-                      >
-                        {userPresets.map(p => (
-                          <option key={p.id} value={p.name}>{p.name}</option>
-                        ))}
-                      </select>
+                    <div className="space-y-3">
+                      <div className="space-y-1">
+                        <label className="text-[10px] text-slate-400 font-bold uppercase">Selecciona municipio</label>
+                        <select
+                          value={selectedPreset}
+                          onChange={(e) => setSelectedPreset(e.target.value)}
+                          disabled={isExtracting}
+                          className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2.5 text-xs text-slate-700 font-medium transition-all shadow-sm focus:outline-none focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 cursor-pointer"
+                        >
+                          {userPresets.map(p => (
+                            <option key={p.id} value={p.name}>{p.name}</option>
+                          ))}
+                        </select>
+                      </div>
+                      
+                      {availableBarrios.length > 0 && (
+                        <div className="space-y-1">
+                          <label className="text-[10px] text-slate-400 font-bold uppercase">Selecciona barrio / zona</label>
+                          <select
+                            value={selectedBarrio}
+                            onChange={(e) => setSelectedBarrio(e.target.value)}
+                            disabled={isExtracting}
+                            className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2.5 text-xs text-slate-700 font-medium transition-all shadow-sm focus:outline-none focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 cursor-pointer"
+                          >
+                            {availableBarrios.map(b => (
+                              <option key={b} value={b}>{b}</option>
+                            ))}
+                          </select>
+                          <p className="text-[9px] text-slate-400 italic">{availableBarrios.length} barrios disponibles en este municipio</p>
+                        </div>
+                      )}
                     </div>
                   ) : (
                     <div className="space-y-1">
