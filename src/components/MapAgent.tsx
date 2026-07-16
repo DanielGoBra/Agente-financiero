@@ -412,13 +412,23 @@ export function MapAgent({ currentUser, onLogout, onUserUpdate }: MapAgentProps)
 
       setStatusText(`Se obtuvieron ${allExtracted.length} negocios. Analizando con IA (filtrando grandes cadenas y perfilando)...`);
 
-      const fetchWithRetry = async (url: string, options: RequestInit, retries = 3, delay = 3000): Promise<Response> => {
+      const fetchWithRetry = async (url: string, options: RequestInit, retries = 2, delay = 3000): Promise<Response> => {
         for (let attempt = 1; attempt <= retries; attempt++) {
           try {
             const res = await fetch(url, options);
             if (res.ok) return res;
             console.warn(`Intento ${attempt}/${retries} falló con código ${res.status}.`);
-            if ([400, 401, 403, 413, 429].includes(res.status)) return res;
+
+            if (res.status === 429 && attempt < retries) {
+              const retryAfter = Number(res.headers.get("Retry-After"));
+              if (Number.isFinite(retryAfter) && retryAfter > 0 && retryAfter <= 60) {
+                setStatusText(`El servicio de IA alcanzó su límite temporal. Reintentando en ${retryAfter} segundos...`);
+                await new Promise(r => setTimeout(r, retryAfter * 1000));
+                continue;
+              }
+            }
+
+            if ([400, 401, 402, 403, 413, 429].includes(res.status)) return res;
             if (attempt === retries) return res;
           } catch (err) {
             console.error(`Intento ${attempt}/${retries} falló por error de red:`, err);
@@ -431,7 +441,10 @@ export function MapAgent({ currentUser, onLogout, onUserUpdate }: MapAgentProps)
       };
 
       let validations: BusinessValidation[] = [];
-      const chunkSize = 100; // Consolidated to 100 to prevent 429 RPM rate limits on Free Tier
+      // This is a per-request size, not a total-results limit. Smaller outputs
+      // avoid truncated JSON while the loop continues through every prospect.
+      const chunkSize = 20;
+      const delayBetweenBatchesMs = 3250;
       const accessToken = await authService.getAccessToken();
       if (!accessToken) {
         throw new Error("Tu sesión expiró. Inicia sesión nuevamente para continuar.");
@@ -457,15 +470,26 @@ export function MapAgent({ currentUser, onLogout, onUserUpdate }: MapAgentProps)
           const errText = await valRes.text();
           let errorMessage: string | null = null;
           try { errorMessage = getApiError(JSON.parse(errText) as unknown); } catch {}
-          throw new Error(errorMessage || `Fallo en el servidor de IA (Código: ${valRes.status}). Reintenta.`);
+
+          if ([402, 429, 500, 502, 503, 504].includes(valRes.status)) {
+            console.warn(errorMessage || `Lote ${currentBatch} sin enriquecimiento de IA (${valRes.status}).`);
+            setStatusText(`Lote ${currentBatch} sin enriquecimiento de IA. Conservando prospectos y continuando...`);
+          } else {
+            throw new Error(errorMessage || `Fallo en el servidor de IA (Código: ${valRes.status}). Reintenta.`);
+          }
+        } else {
+          const valData = await valRes.json() as unknown;
+          const batchValidations = getValidations(valData);
+          if (batchValidations) {
+            validations = [...validations, ...batchValidations];
+          } else {
+            console.warn(`Lote ${currentBatch} devolvió una respuesta de IA inválida. Se conservarán sus prospectos.`);
+          }
         }
 
-        const valData = await valRes.json() as unknown;
-        const batchValidations = getValidations(valData);
-        if (!batchValidations) {
-          throw new Error("El servidor de IA devolvió una respuesta inválida.");
+        if (i + chunkSize < allExtracted.length) {
+          await new Promise(r => setTimeout(r, delayBetweenBatchesMs));
         }
-        validations = [...validations, ...batchValidations];
       }
 
       setStatusText("Finalizando perfilamiento...");
@@ -488,12 +512,19 @@ export function MapAgent({ currentUser, onLogout, onUserUpdate }: MapAgentProps)
         .filter(b => b.isMicroSME)
         .sort((a, b) => b.opportunityScore - a.opportunityScore);
 
+      const enrichedIds = new Set(validations.map(validation => validation.id));
+      const withoutAiEnrichment = allExtracted.filter(business => !enrichedIds.has(business.id)).length;
+
       setResults(finalResults);
       
       try {
         setStatusText(`Rastreo finalizado: ${finalResults.length} pymes perfiladas. Guardando en base de datos...`);
         await databaseService.saveLeads(currentUser.id, finalResults);
-        setStatusText(`Rastreo finalizado: ${finalResults.length} pymes perfiladas y guardadas automáticamente.`);
+        setStatusText(
+          withoutAiEnrichment > 0
+            ? `Rastreo finalizado: ${finalResults.length} prospectos guardados; ${withoutAiEnrichment} quedaron con perfil base por límite temporal de IA.`
+            : `Rastreo finalizado: ${finalResults.length} pymes perfiladas y guardadas automáticamente.`
+        );
         
         const activeKeyword = isCustomKeyword ? customTerm : selectedTerm;
         const activeZone = usePreset ? selectedPreset : customLocation;

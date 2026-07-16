@@ -49,6 +49,7 @@ Rota inmediatamente cualquier clave que haya aparecido en un repositorio, captur
 
 - Usa una clave exclusiva para esta aplicación.
 - Define límite de crédito y reinicio mensual en la configuración de la clave.
+- `openrouter/free` es apropiado para pruebas y bajo volumen, pero tiene límites por minuto y por día. Para prospección intensiva usa un modelo de pago con presupuesto controlado.
 - Rota la clave si OpenRouter o GitHub notifican una exposición.
 
 ### Supabase Auth
