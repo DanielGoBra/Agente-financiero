@@ -39,7 +39,7 @@ export function MapVisualizer({ businesses, selectedBiz, onSelectBiz, onSaveLead
       }
     : { lat: 6.1846, lng: -75.5969 }; // Center of Antioquia
 
-  // Eye-friendly color mapping (Teal, Muted Blue, Soft Slate)
+  // Brand-aligned color mapping by opportunity tier.
   const getMarkerColor = (score: number) => {
     if (score >= 80) return "#0f766e"; // Teal 700 (High opportunity)
     if (score >= 50) return "#2563eb"; // Blue 600 (Medium opportunity)
@@ -53,7 +53,7 @@ export function MapVisualizer({ businesses, selectedBiz, onSelectBiz, onSaveLead
   };
 
   return (
-    <div className="w-full h-full relative">
+    <div className="w-full h-full relative overflow-hidden rounded-xl bg-slate-100">
       <Map
         defaultZoom={13}
         defaultCenter={defaultCenter}
@@ -102,7 +102,7 @@ export function MapVisualizer({ businesses, selectedBiz, onSelectBiz, onSaveLead
             }}
             pixelOffset={[0, -10]}
           >
-            <div className="p-3.5 max-w-[290px] font-sans text-xs text-slate-800 leading-normal">
+            <div className="p-3.5 max-w-[290px] font-body text-xs text-slate-800 leading-normal">
               <div className="mb-2.5">
                 <div className="flex justify-between items-start gap-2 mb-1">
                   <h4 className="font-bold text-slate-900 text-sm leading-tight font-sans">{activeWindow.name}</h4>
@@ -181,7 +181,7 @@ export function MapVisualizer({ businesses, selectedBiz, onSelectBiz, onSaveLead
                     className={`px-3 py-1.5 rounded-lg text-[9.5px] font-bold uppercase tracking-wider transition-all cursor-pointer ${
                       isSaved?.(activeWindow.id)
                         ? "bg-slate-100 text-slate-400 cursor-not-allowed border border-slate-200 shadow-none"
-                        : "bg-teal-600 text-white hover:bg-teal-700 border border-teal-600 shadow-sm"
+                        : "primary-action"
                     }`}
                   >
                     {isSaved?.(activeWindow.id) ? "Guardado" : "Guardar Lead"}

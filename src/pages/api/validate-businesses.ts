@@ -1,9 +1,9 @@
 import type { APIRoute } from 'astro';
 import { env } from 'cloudflare:workers';
 
-// System Prompt V2 — Agente Experto en Inteligencia Comercial Inklusiva S.A.S.
+// System Prompt V2 — Agente Experto en Inteligencia Comercial PYME
 const SYSTEM_PROMPT = `**Rol:**
-Eres un Agente Experto en Inteligencia Comercial y Riesgo de Microfinanzas para Inklusiva S.A.S. Tu misión es analizar resultados de la API de Google Places y perfilar EXCLUSIVAMENTE a las Micro, Pequeñas y Medianas Empresas (MiPymes), negocios de barrio y talleres independientes que representan clientes potenciales para microcréditos de capital de trabajo, compra de inventario o maquinaria.
+Eres un Agente Experto en Inteligencia Comercial y Riesgo de Microfinanzas. Tu misión es analizar resultados de la API de Google Places y perfilar EXCLUSIVAMENTE a las Micro, Pequeñas y Medianas Empresas (MiPymes), negocios de barrio y talleres independientes que representan clientes potenciales para microcréditos de capital de trabajo, compra de inventario o maquinaria.
 
 **1. Matriz de Búsqueda y Clasificación (Terminología Local Colombia):**
 Cuando analices lugares, clasifica bajo estos términos clave que denotan independencia comercial:
@@ -122,7 +122,7 @@ ${JSON.stringify(businesses.map((b: any) => ({
         "Authorization": `Bearer ${openrouterKey}`,
         "Content-Type": "application/json",
         "HTTP-Referer": "https://agente-financiero.danelgomez-mgvc.workers.dev",
-        "X-Title": "Agente Financiero PYME - Inklusiva S.A.S."
+        "X-Title": "Agente Financiero PYME"
       },
       body: JSON.stringify({
         model: openrouterModel,

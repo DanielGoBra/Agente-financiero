@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { motion, AnimatePresence } from "motion/react";
 import { useMapsLibrary } from "@vis.gl/react-google-maps";
 import { 
   Search, Loader2, Download, AlertCircle, FileSpreadsheet, 
@@ -240,7 +241,7 @@ export function MapAgent({ currentUser, onLogout, onUserUpdate }: MapAgentProps)
       const addrKey = biz.address.toLowerCase().trim();
       return dbClients.some(c => 
         (c.name.toLowerCase().trim() === nameKey || c.address.toLowerCase().trim() === addrKey) && 
-        c.crmStatus && c.crmStatus !== ''
+        Boolean(c.crmStatus)
       );
     }
     return false;
@@ -493,81 +494,70 @@ export function MapAgent({ currentUser, onLogout, onUserUpdate }: MapAgentProps)
   };
 
   return (
-    <div className="w-full h-full bg-slate-50 text-slate-800 font-sans overflow-hidden flex flex-col">
+    <div className="w-full h-full workspace-shell text-slate-800 font-body overflow-hidden flex flex-col">
       
-      {/* Eye-Friendly Header Section */}
-      <header className="px-8 py-5 border-b border-slate-200 flex flex-col md:flex-row justify-between items-start md:items-center bg-white gap-4 shadow-sm">
-        <div>
-          <p className="uppercase tracking-widest text-[9px] font-bold mb-1 text-teal-700 flex items-center gap-1.5 font-sans">
-            <Layers size={10} /> Plataforma de Prospección Comercial Bancaria
-          </p>
-          <h1 className="text-3xl font-bold leading-tight tracking-tight text-slate-900">
-            Localizador <span className="text-teal-600 italic font-serif font-light">PYMEs</span>
-          </h1>
+      {/* Premium Header */}
+      <header className="px-4 md:px-6 xl:px-8 py-4 border-b border-slate-200/70 flex flex-col xl:flex-row justify-between items-start xl:items-center glass sticky top-0 z-40 gap-3 shadow-xs">
+        <div className="flex items-center gap-3.5">
+          <img src="/logo-pymes.svg" alt="Localizador PYMEs" className="w-10 h-10 drop-shadow-md" />
+          <div>
+            <p className="uppercase tracking-[0.2em] text-[9px] font-bold mb-0.5 text-ink-700 font-body">
+              Plataforma de Prospección Comercial
+            </p>
+            <h1 className="text-2xl font-bold leading-tight tracking-tight text-slate-900">
+              Localizador <span className="text-ink-600 font-display italic font-normal">PYMEs</span>
+            </h1>
+          </div>
         </div>
         
-        <div className="flex flex-col md:flex-row items-center gap-4 self-stretch md:self-auto justify-between md:justify-end">
+        <div className="flex flex-col md:flex-row items-stretch md:items-center gap-3 self-stretch xl:self-auto justify-between md:justify-end min-w-0">
           {/* Navigation Tabs */}
-          <nav className="flex border border-slate-200 p-0.5 bg-slate-50 font-sans text-xs font-semibold rounded-lg shadow-inner">
-            <button
-              onClick={() => setActiveTab("search")}
-              className={cn(
-                "px-4 py-2 flex items-center gap-1.5 rounded-md transition-all cursor-pointer",
-                activeTab === "search" ? "bg-white text-teal-700 shadow-sm border border-slate-100" : "hover:text-slate-900 text-slate-500"
-              )}
-            >
-              <MapIcon size={14} />
-              Buscador & Mapa
-            </button>
-            <button
-              onClick={() => setActiveTab("crm")}
-              className={cn(
-                "px-4 py-2 flex items-center gap-1.5 rounded-md transition-all cursor-pointer",
-                activeTab === "crm" ? "bg-white text-teal-700 shadow-sm border border-slate-100" : "hover:text-slate-900 text-slate-500"
-              )}
-            >
-              <Database size={14} />
-              Pipeline CRM ({crmLeads.length})
-            </button>
-            <button
-              onClick={() => setActiveTab("dashboard")}
-              className={cn(
-                "px-4 py-2 flex items-center gap-1.5 rounded-md transition-all cursor-pointer",
-                activeTab === "dashboard" ? "bg-white text-teal-700 shadow-sm border border-slate-100" : "hover:text-slate-900 text-slate-500"
-              )}
-            >
-              <Activity size={14} />
-              Dashboard
-            </button>
-            {(currentUser.role === "superAdmin" || currentUser.role === "admin") && (
+          <nav className="flex border border-slate-200/60 p-1 bg-white/60 backdrop-blur-sm font-body text-xs font-semibold rounded-xl shadow-xs gap-0.5 overflow-x-auto custom-scrollbar max-w-full" aria-label="Navegación principal">
+            {[
+              { key: "search" as const, icon: <MapIcon size={14} />, label: "Buscador & Mapa" },
+              { key: "crm" as const, icon: <Database size={14} />, label: `Pipeline CRM (${crmLeads.length})` },
+              { key: "dashboard" as const, icon: <Activity size={14} />, label: "Dashboard" },
+              ...((currentUser.role === "superAdmin" || currentUser.role === "admin") ? [{ key: "admin" as const, icon: <ShieldAlert size={14} className="text-ink-600" />, label: "Panel Admin" }] : [])
+            ].map(tab => (
               <button
-                onClick={() => setActiveTab("admin")}
+                key={tab.key}
+                onClick={() => setActiveTab(tab.key)}
                 className={cn(
-                  "px-4 py-2 flex items-center gap-1.5 rounded-md transition-all cursor-pointer",
-                  activeTab === "admin" ? "bg-white text-teal-700 shadow-sm border border-slate-100" : "hover:text-slate-900 text-slate-500"
+                  "px-3.5 py-2.5 flex items-center gap-1.5 rounded-lg transition-all duration-200 cursor-pointer relative whitespace-nowrap flex-shrink-0",
+                  activeTab === tab.key
+                    ? "bg-white text-ink-700 shadow-soft border border-slate-100/80"
+                    : "hover:text-slate-800 text-slate-500 hover:bg-white/40"
                 )}
               >
-                <ShieldAlert size={14} className="text-teal-600 animate-pulse" />
-                Panel Admin
+                {tab.icon}
+                {tab.label}
+                {activeTab === tab.key && (
+                  <motion.div
+                    layoutId="activeTabIndicator"
+                    className="absolute bottom-0 left-[15%] right-[15%] h-[2.5px] bg-gradient-to-r from-ink-700 to-ink-500 rounded-full"
+                    transition={{ type: "spring", stiffness: 380, damping: 30 }}
+                  />
+                )}
               </button>
-            )}
+            ))}
           </nav>
 
           {/* User Info & Logout */}
-          <div className="flex items-center gap-3 border-t md:border-t-0 md:border-l border-slate-200 pt-3 md:pt-0 md:pl-4 w-full md:w-auto justify-end font-sans">
+          <div className="flex items-center gap-3 border-t md:border-t-0 md:border-l border-slate-200/60 pt-3 md:pt-0 md:pl-4 w-full md:w-auto justify-end font-body">
             <div className="text-right hidden sm:block">
               <p className="text-xs font-bold text-slate-800 leading-none">{currentUser.fullName}</p>
               <p className="text-[9px] text-slate-400 font-semibold mt-1 uppercase tracking-wider">{currentUser.role}</p>
             </div>
             
-            <div className="w-8 h-8 rounded-full bg-teal-600 text-white flex items-center justify-center font-bold text-xs shadow-sm uppercase select-none">
+            <div className="w-9 h-9 rounded-full bg-gradient-to-br from-ink-600 to-ink-700 text-white flex items-center justify-center font-bold text-xs shadow-md uppercase select-none ring-2 ring-ink-200/30">
               {currentUser.fullName.substring(0, 2)}
             </div>
             
             <button
               onClick={onLogout}
-              className="p-2 border border-slate-200 hover:border-rose-200 hover:bg-rose-50 text-slate-400 hover:text-rose-600 rounded-lg transition-all cursor-pointer shadow-sm ml-1"
+              className="p-2 border border-slate-200/60 hover:border-rose-200 hover:bg-rose-50 text-slate-400 hover:text-rose-600 rounded-xl transition-all cursor-pointer shadow-xs ml-1"
               title="Cerrar Sesión"
+              aria-label="Cerrar sesión"
             >
               <LogOut size={14} />
             </button>
@@ -576,18 +566,27 @@ export function MapAgent({ currentUser, onLogout, onUserUpdate }: MapAgentProps)
       </header>
 
       {/* Main Workspace */}
-      <div className="flex-1 flex overflow-hidden">
+      <div className="flex-1 flex min-h-0 overflow-hidden">
+        <AnimatePresence mode="wait" initial={false}>
+          <motion.div
+            key={activeTab}
+            className="flex-1 flex min-h-0 overflow-hidden"
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -5 }}
+            transition={{ duration: 0.2, ease: "easeOut" }}
+          >
         
         {/* Tab 1: Search & Map */}
         {activeTab === "search" && (
-          <div className="flex-1 flex flex-col lg:flex-row overflow-hidden p-6 gap-6 bg-slate-100/50">
+          <div className="flex-1 flex flex-col lg:flex-row overflow-y-auto lg:overflow-hidden p-4 md:p-5 xl:p-6 gap-4 xl:gap-6">
             
             {/* Sidebar Controls */}
-            <aside className="w-full lg:w-80 p-6 flex flex-col gap-6 bg-white rounded-2xl border border-slate-100 shadow-sm overflow-y-auto">
+            <aside className="search-sidebar w-full lg:w-80 xl:w-[340px] p-5 xl:p-6 flex flex-col gap-6 product-panel-raised overflow-y-auto custom-scrollbar flex-shrink-0">
               
               {/* Location Input Section */}
               <section className="space-y-3.5">
-                <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500 border-b border-slate-100 pb-1">
+                <h3 className="section-kicker border-b border-slate-100 pb-2.5">
                   1. Territorio
                 </h3>
                 
@@ -668,7 +667,7 @@ export function MapAgent({ currentUser, onLogout, onUserUpdate }: MapAgentProps)
               </section>
 
               {/* Assigned Zones Info Card */}
-              <section className="bg-slate-50 border border-slate-100 p-4 rounded-2xl space-y-2 shadow-sm font-sans">
+              <section className="surface-subtle p-4 rounded-2xl space-y-2 shadow-xs font-body">
                 <h4 className="text-[10px] font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1.5">
                   <CheckSquare size={13} className="text-teal-600" /> Zonas Asignadas a Tu Perfil
                 </h4>
@@ -687,7 +686,7 @@ export function MapAgent({ currentUser, onLogout, onUserUpdate }: MapAgentProps)
 
               {/* Business Categories Section */}
               <section className="space-y-3.5">
-                <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500 border-b border-slate-100 pb-1">
+                <h3 className="section-kicker border-b border-slate-100 pb-2.5">
                   2. Sector Comercial
                 </h3>
                 
@@ -749,10 +748,10 @@ export function MapAgent({ currentUser, onLogout, onUserUpdate }: MapAgentProps)
                   onClick={handleStartExtraction}
                   disabled={isExtracting}
                   className={cn(
-                    "w-full text-xs font-semibold uppercase tracking-wider py-3 rounded-lg border transition-all cursor-pointer shadow-sm",
+                    "w-full text-xs font-semibold uppercase tracking-wider py-3.5 rounded-xl transition-all cursor-pointer",
                     isExtracting 
-                      ? "bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed"
-                      : "bg-teal-600 text-white border-teal-600 hover:bg-teal-700 hover:border-teal-700"
+                      ? "primary-action"
+                      : "primary-action"
                   )}
                 >
                   {isExtracting ? (
@@ -784,7 +783,7 @@ export function MapAgent({ currentUser, onLogout, onUserUpdate }: MapAgentProps)
                   <h4 className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-3">Exportar datos</h4>
                   <button
                     onClick={handleExportExcel}
-                    className="w-full border border-slate-200 bg-white text-slate-700 text-xs font-semibold py-2.5 rounded-lg hover:bg-slate-50 transition-all flex items-center justify-center gap-2 cursor-pointer shadow-sm"
+                    className="w-full secondary-action text-xs font-semibold py-2.5 rounded-xl flex items-center justify-center gap-2 cursor-pointer"
                   >
                     <FileSpreadsheet size={14} className="text-teal-600" />
                     Exportar listado Excel
@@ -797,7 +796,7 @@ export function MapAgent({ currentUser, onLogout, onUserUpdate }: MapAgentProps)
             <main className="flex-1 flex flex-col xl:flex-row overflow-hidden bg-transparent gap-6">
               
               {/* Left pane: Results Table list */}
-              <div className="flex-1 p-6 overflow-auto bg-white rounded-2xl border border-slate-100 shadow-sm flex flex-col">
+              <div className="flex-1 p-5 xl:p-6 overflow-auto product-panel-raised flex flex-col custom-scrollbar min-w-0">
                 <div className="flex justify-between items-center mb-5 border-b border-slate-100 pb-3">
                   <h2 className="text-xl font-bold text-slate-900">Resultados Identificados</h2>
                   <span className="text-[10px] text-teal-700 bg-teal-50 border border-teal-100 px-2.5 py-0.5 rounded-full font-bold uppercase tracking-wide">
@@ -807,7 +806,7 @@ export function MapAgent({ currentUser, onLogout, onUserUpdate }: MapAgentProps)
 
                 {results.length > 0 ? (
                   <div className="space-y-3">
-                    <table className="w-full text-left text-xs border-collapse bg-white rounded-xl shadow-sm overflow-hidden border border-slate-100">
+                    <table className="w-full text-left text-xs border-collapse bg-white rounded-xl shadow-sm overflow-hidden border border-slate-100 data-table">
                       <thead>
                         <tr className="uppercase tracking-wider opacity-60 border-b border-slate-100 bg-slate-50/50 text-[10px] font-bold text-slate-600">
                           <th className="p-3.5 min-w-[150px]">Negocio</th>
@@ -823,7 +822,7 @@ export function MapAgent({ currentUser, onLogout, onUserUpdate }: MapAgentProps)
                             onClick={() => setSelectedBiz(biz)}
                             className={cn(
                               "hover:bg-slate-50/80 transition-all duration-200 cursor-pointer border-b border-slate-100 last:border-0",
-                              selectedBiz?.id === biz.id ? "bg-slate-50/70" : ""
+                              selectedBiz?.id === biz.id ? "bg-ink-50/70 shadow-[inset_3px_0_0_#14b8a6]" : ""
                             )}
                           >
                             <td className="p-3.5 align-top">
@@ -899,8 +898,10 @@ export function MapAgent({ currentUser, onLogout, onUserUpdate }: MapAgentProps)
                     </table>
                   </div>
                 ) : !isExtracting && !error ? (
-                  <div className="h-64 flex flex-col items-center justify-center text-slate-300 border border-dashed border-slate-200 bg-white/70 mt-4 p-8 text-center rounded-2xl shadow-sm">
-                    <Search size={32} className="mb-2.5 opacity-40 text-teal-600" />
+                  <div className="h-64 flex flex-col items-center justify-center text-slate-300 border border-dashed border-ink-200/80 surface-subtle mt-4 p-8 text-center rounded-2xl">
+                    <div className="w-12 h-12 rounded-2xl bg-ink-50 border border-ink-100 flex items-center justify-center mb-3">
+                      <Search size={22} className="text-ink-600" />
+                    </div>
                     <p className="text-slate-800 text-xs font-bold uppercase tracking-wider">Esperando búsqueda</p>
                     <p className="text-[11px] text-slate-400 mt-1 max-w-xs leading-relaxed">
                       Elige el territorio y sector en la barra lateral e inicia el rastreo para perfilar las pymes de la zona.
@@ -910,8 +911,8 @@ export function MapAgent({ currentUser, onLogout, onUserUpdate }: MapAgentProps)
               </div>
 
               {/* Right pane: Map Visualizer */}
-              <div className="w-full xl:w-96 xl:w-[420px] p-6 flex flex-col h-[450px] xl:h-full bg-white rounded-2xl border border-slate-100 shadow-sm">
-                <h3 className="text-sm font-bold text-slate-700 mb-3.5 flex items-center gap-2 uppercase tracking-wider">
+              <div className="w-full xl:w-[420px] p-5 xl:p-6 flex flex-col h-[450px] xl:h-full product-panel-raised flex-shrink-0">
+                <h3 className="section-kicker mb-3.5 flex items-center gap-2">
                   <MapIcon size={14} className="text-teal-600" /> Mapeo geográfico
                 </h3>
                 <div className="flex-1 min-h-[300px] rounded-xl overflow-hidden border border-slate-100">
@@ -945,10 +946,13 @@ export function MapAgent({ currentUser, onLogout, onUserUpdate }: MapAgentProps)
 
         {/* Tab 4: Admin Panel */}
         {activeTab === "admin" && (
-          <div className="flex-1 overflow-y-auto p-6 bg-slate-100/50">
+          <div className="flex-1 overflow-y-auto p-4 md:p-6 custom-scrollbar">
             <AdminPanel />
           </div>
         )}
+
+          </motion.div>
+        </AnimatePresence>
 
       </div>
 

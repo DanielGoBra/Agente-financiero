@@ -70,10 +70,10 @@ export function LeadCRM({ leads, onUpdateLead, onRemoveLead }: LeadCRMProps) {
   };
 
   return (
-    <div className="flex-1 flex flex-col lg:flex-row h-full overflow-hidden p-6 gap-6 bg-slate-100/50 font-sans">
+    <div className="flex-1 flex flex-col lg:flex-row h-full overflow-y-auto lg:overflow-hidden p-4 md:p-5 xl:p-6 gap-4 xl:gap-6 font-body">
       
       {/* CRM Main List Panel */}
-      <div className="flex-1 p-6 flex flex-col overflow-hidden bg-white rounded-2xl border border-slate-100 shadow-sm">
+      <div className="flex-1 p-5 xl:p-6 flex flex-col overflow-hidden product-panel-raised min-w-0">
         
         {/* Header and Export Controls */}
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-5">
@@ -87,7 +87,7 @@ export function LeadCRM({ leads, onUpdateLead, onRemoveLead }: LeadCRMProps) {
           {leads.length > 0 && (
             <button
               onClick={handleExportCRM}
-              className="flex items-center gap-2 border border-slate-200 bg-white text-slate-700 px-4 py-2 text-xs font-semibold rounded-lg hover:bg-slate-50 transition-all cursor-pointer shadow-sm"
+              className="secondary-action flex items-center gap-2 px-4 py-2.5 text-xs font-semibold rounded-xl cursor-pointer"
             >
               <FileSpreadsheet size={14} className="text-teal-600" />
               Exportar Pipeline
@@ -96,7 +96,7 @@ export function LeadCRM({ leads, onUpdateLead, onRemoveLead }: LeadCRMProps) {
         </div>
 
         {/* Filters bar */}
-        <div className="flex flex-col md:flex-row gap-4 mb-5 bg-slate-50/70 p-4 border border-slate-150 rounded-xl">
+        <div className="flex flex-col md:flex-row gap-4 mb-5 surface-subtle p-4 rounded-2xl">
           <div className="flex-1 relative font-sans">
             <Search className="absolute left-3 top-3 text-slate-400" size={16} />
             <input
@@ -104,7 +104,7 @@ export function LeadCRM({ leads, onUpdateLead, onRemoveLead }: LeadCRMProps) {
               placeholder="Buscar por nombre, dirección o municipio..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full bg-white border border-slate-200 pl-10 pr-4 py-2.5 text-xs rounded-xl focus:outline-none focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 placeholder:text-slate-400 font-medium text-slate-700 shadow-sm"
+              className="control-field pl-10 pr-4 py-2.5 text-xs placeholder:text-slate-400 font-medium"
             />
           </div>
 
@@ -113,7 +113,7 @@ export function LeadCRM({ leads, onUpdateLead, onRemoveLead }: LeadCRMProps) {
             <select
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
-              className="bg-white border border-slate-200 px-3 py-2.5 text-xs rounded-xl focus:outline-none focus:ring-2 focus:ring-teal-500/20 focus:border-teal-500 text-slate-600 font-medium transition-all shadow-sm cursor-pointer"
+              className="control-field px-3 py-2.5 text-xs font-medium cursor-pointer min-w-[170px]"
             >
               <option value="all">Todos los estados</option>
               <option value="nuevo">Nuevos</option>
@@ -126,9 +126,9 @@ export function LeadCRM({ leads, onUpdateLead, onRemoveLead }: LeadCRMProps) {
         </div>
 
         {/* Leads Table / Grid */}
-        <div className="flex-1 overflow-auto rounded-xl border border-slate-100 bg-white shadow-sm">
+        <div className="flex-1 overflow-auto rounded-2xl border border-slate-100 bg-white shadow-xs custom-scrollbar">
           {filteredLeads.length > 0 ? (
-            <table className="w-full text-left text-xs border-collapse">
+            <table className="w-full text-left text-xs border-collapse data-table">
               <thead>
                 <tr className="uppercase tracking-wider opacity-60 border-b border-slate-100 bg-slate-50/50 text-[10px] font-bold text-slate-600">
                   <th className="p-3.5 min-w-[200px]">Empresa</th>
@@ -147,7 +147,7 @@ export function LeadCRM({ leads, onUpdateLead, onRemoveLead }: LeadCRMProps) {
                       onClick={() => handleSelectLead(lead)}
                       className={cn(
                         "hover:bg-slate-50/70 cursor-pointer transition-colors",
-                        selectedLeadId === lead.id ? "bg-slate-50/50" : ""
+                        selectedLeadId === lead.id ? "bg-ink-50/70 shadow-[inset_3px_0_0_#14b8a6]" : ""
                       )}
                     >
                       <td className="p-3.5 align-top">
@@ -208,11 +208,11 @@ export function LeadCRM({ leads, onUpdateLead, onRemoveLead }: LeadCRMProps) {
       </div>
 
       {/* CRM Detailed Sidebar Panel */}
-      <aside className="w-full lg:w-96 p-6 bg-white flex flex-col overflow-y-auto rounded-2xl border border-slate-100 shadow-sm">
+      <aside className="w-full lg:w-96 p-5 xl:p-6 product-panel-raised flex flex-col overflow-y-auto custom-scrollbar flex-shrink-0">
         {selectedLead ? (
           <div className="space-y-5 font-sans">
             <div>
-              <p className="text-[9px] uppercase tracking-wider text-teal-600 font-bold mb-1">
+              <p className="section-kicker mb-2">
                 Ficha del Prospecto
               </p>
               <h3 className="text-xl font-bold leading-tight text-slate-900">
@@ -221,7 +221,7 @@ export function LeadCRM({ leads, onUpdateLead, onRemoveLead }: LeadCRMProps) {
               <p className="text-xs text-slate-400 font-medium mt-1">{selectedLead.address}</p>
             </div>
 
-            <div className="grid grid-cols-2 gap-3 bg-slate-50 p-3.5 rounded-xl border border-slate-100">
+            <div className="grid grid-cols-2 gap-3 surface-subtle p-4 rounded-2xl">
               <div>
                 <span className="text-[9px] font-bold uppercase tracking-wider text-slate-400 block">Confianza IA</span>
                 <span className="font-bold text-xs text-slate-700">{selectedLead.reliabilityScore}/10</span>
@@ -281,7 +281,7 @@ export function LeadCRM({ leads, onUpdateLead, onRemoveLead }: LeadCRMProps) {
                 <select
                   value={editingStatus}
                   onChange={(e) => setEditingStatus(e.target.value as ValidatedBusiness["crmStatus"])}
-                  className="w-full bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-xs focus:outline-none focus:border-teal-500 focus:bg-white text-slate-700 font-medium transition-all"
+                  className="control-field px-3 py-2.5 text-xs font-medium"
                 >
                   <option value="nuevo">Nuevo</option>
                   <option value="contactado">Contactado</option>
@@ -300,13 +300,13 @@ export function LeadCRM({ leads, onUpdateLead, onRemoveLead }: LeadCRMProps) {
                   onChange={(e) => setEditingNotes(e.target.value)}
                   placeholder="Detalla acuerdos de llamadas, monto requerido, contacto del dueño..."
                   rows={4}
-                  className="w-full bg-slate-50 border border-slate-200 rounded-lg p-3 text-xs focus:outline-none focus:border-teal-500 focus:bg-white text-slate-700 transition-all placeholder:text-slate-400 placeholder:italic resize-none font-sans leading-relaxed"
+                  className="control-field p-3 text-xs placeholder:text-slate-400 placeholder:italic resize-none leading-relaxed"
                 />
               </div>
 
               <button
                 onClick={handleSaveChanges}
-                className="w-full bg-teal-600 text-white py-2.5 rounded-lg text-xs font-bold uppercase tracking-wider hover:bg-teal-700 transition-all flex items-center justify-center gap-2 cursor-pointer shadow-sm"
+                className="primary-action w-full py-3 rounded-xl text-xs font-bold uppercase tracking-wider flex items-center justify-center gap-2 cursor-pointer"
               >
                 <Save size={13} />
                 Guardar notas e historial

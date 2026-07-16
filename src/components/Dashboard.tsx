@@ -13,9 +13,11 @@ interface DashboardProps {
 export function Dashboard({ leads }: DashboardProps) {
   if (leads.length === 0) {
     return (
-      <div className="flex-1 p-6 md:p-8 flex flex-col justify-center items-center text-center bg-slate-50 font-sans">
-        <div className="max-w-md border border-dashed border-slate-200 bg-white p-8 rounded-2xl shadow-sm">
-          <Activity size={36} className="mx-auto mb-3.5 text-teal-600 opacity-60 animate-pulse" />
+      <div className="flex-1 p-6 md:p-8 flex flex-col justify-center items-center text-center font-body">
+        <div className="max-w-md border border-dashed border-ink-200 product-panel-raised p-8">
+          <div className="w-14 h-14 mx-auto mb-4 rounded-2xl bg-ink-50 border border-ink-100 flex items-center justify-center">
+            <Activity size={26} className="text-ink-600" />
+          </div>
           <h3 className="text-slate-800 text-sm font-bold uppercase tracking-wider">Métricas del Pipeline</h3>
           <p className="text-xs text-slate-400 mt-2 leading-relaxed">
             No hay prospectos guardados en el CRM todavía. Guarda negocios desde la pestaña de Búsqueda y Mapa para generar los reportes y estadísticas de crédito automáticamente.
@@ -78,7 +80,7 @@ export function Dashboard({ leads }: DashboardProps) {
   });
 
   return (
-    <div className="flex-1 p-6 overflow-y-auto space-y-8 bg-slate-100/50 font-sans">
+    <div className="flex-1 p-4 md:p-6 xl:p-8 overflow-y-auto space-y-7 font-body custom-scrollbar">
       
       {/* Header */}
       <div>
@@ -92,7 +94,7 @@ export function Dashboard({ leads }: DashboardProps) {
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         
         {/* Total Prospects */}
-        <div className="border border-slate-200/70 p-5 bg-white flex flex-col justify-between h-28 rounded-xl shadow-sm">
+        <div className="metric-card p-5 flex flex-col justify-between h-32">
           <div className="flex justify-between items-start">
             <span className="text-[10px] uppercase font-bold tracking-wider text-slate-400">Total Prospectos</span>
             <Users size={16} className="text-slate-400" />
@@ -104,7 +106,7 @@ export function Dashboard({ leads }: DashboardProps) {
         </div>
 
         {/* Avg Opportunity */}
-        <div className="border border-slate-200/70 p-5 bg-white flex flex-col justify-between h-28 rounded-xl shadow-sm">
+        <div className="metric-card p-5 flex flex-col justify-between h-32">
           <div className="flex justify-between items-start">
             <span className="text-[10px] uppercase font-bold tracking-wider text-slate-400">Score de Captación</span>
             <Target size={16} className="text-slate-400" />
@@ -116,7 +118,7 @@ export function Dashboard({ leads }: DashboardProps) {
         </div>
 
         {/* Active Ratio */}
-        <div className="border border-slate-200/70 p-5 bg-white flex flex-col justify-between h-28 rounded-xl shadow-sm">
+        <div className="metric-card p-5 flex flex-col justify-between h-32">
           <div className="flex justify-between items-start">
             <span className="text-[10px] uppercase font-bold tracking-wider text-slate-400">Tasa de Contacto</span>
             <TrendingUp size={16} className="text-slate-400" />
@@ -128,7 +130,8 @@ export function Dashboard({ leads }: DashboardProps) {
         </div>
 
         {/* Estimated Demand Portfolio - Soft Teal Accent Card */}
-        <div className="border border-teal-700/10 p-5 bg-teal-800 text-white flex flex-col justify-between h-28 rounded-xl shadow-sm">
+        <div className="relative overflow-hidden border border-ink-600/20 p-5 bg-gradient-to-br from-ink-800 to-ink-950 text-white flex flex-col justify-between h-32 rounded-2xl shadow-medium">
+          <div className="absolute -right-8 -top-10 w-28 h-28 rounded-full bg-white/5" />
           <div className="flex justify-between items-start">
             <span className="text-[10px] uppercase font-bold tracking-wider text-teal-200">Demanda Estimada</span>
             <DollarSign size={16} className="text-teal-300 opacity-60" />
@@ -146,7 +149,7 @@ export function Dashboard({ leads }: DashboardProps) {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         
         {/* Industry Distribution & Business Sizes */}
-        <div className="border border-slate-200/60 p-6 rounded-xl bg-white flex flex-col gap-5 shadow-sm">
+        <div className="product-panel-raised p-5 md:p-6 flex flex-col gap-5">
           <div>
             <h3 className="text-base font-bold text-slate-800 flex items-center gap-2">
               <BarChart3 size={15} className="text-teal-600" /> Distribución Industrial
@@ -167,7 +170,7 @@ export function Dashboard({ leads }: DashboardProps) {
                   </div>
                   <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden border border-slate-50">
                     <div 
-                      className="bg-teal-600 h-full rounded-full transition-all duration-500" 
+                      className="bg-gradient-to-r from-ink-700 to-ink-500 h-full rounded-full transition-all duration-500"
                       style={{ width: `${pct}%` }}
                     />
                   </div>
@@ -180,21 +183,21 @@ export function Dashboard({ leads }: DashboardProps) {
           <div className="border-t border-slate-100 pt-5">
             <h4 className="text-xs font-bold text-slate-700 mb-3 uppercase tracking-wider">Perfil por Tamaño de Negocio</h4>
             <div className="grid grid-cols-3 gap-3 text-center">
-              <div className="bg-slate-50 p-3 rounded-lg border border-slate-100 shadow-inner">
+              <div className="surface-subtle p-3 rounded-xl">
                 <span className="text-[9px] uppercase font-bold text-slate-400 block">Micropyme</span>
                 <span className="text-lg font-bold text-slate-800 block mt-0.5">{sizeCounts.micro}</span>
                 <span className="text-[9px] text-slate-400 font-semibold block">
                   {Math.round((sizeCounts.micro / totalLeads) * 100)}%
                 </span>
               </div>
-              <div className="bg-slate-50 p-3 rounded-lg border border-slate-100 shadow-inner">
+              <div className="surface-subtle p-3 rounded-xl">
                 <span className="text-[9px] uppercase font-bold text-slate-400 block">Pequeña</span>
                 <span className="text-lg font-bold text-slate-800 block mt-0.5">{sizeCounts.small}</span>
                 <span className="text-[9px] text-slate-400 font-semibold block">
                   {Math.round((sizeCounts.small / totalLeads) * 100)}%
                 </span>
               </div>
-              <div className="bg-slate-50 p-3 rounded-lg border border-slate-100 shadow-inner">
+              <div className="surface-subtle p-3 rounded-xl">
                 <span className="text-[9px] uppercase font-bold text-slate-400 block">Mediana</span>
                 <span className="text-lg font-bold text-slate-800 block mt-0.5">{sizeCounts.medium}</span>
                 <span className="text-[9px] text-slate-400 font-semibold block">
@@ -206,7 +209,7 @@ export function Dashboard({ leads }: DashboardProps) {
         </div>
 
         {/* Sales Funnel & Credit Needs */}
-        <div className="border border-slate-200/60 p-6 rounded-xl bg-white flex flex-col gap-5 shadow-sm">
+        <div className="product-panel-raised p-5 md:p-6 flex flex-col gap-5">
           <div>
             <h3 className="text-base font-bold text-slate-800 flex items-center gap-2">
               <Activity size={15} className="text-teal-600" /> Conversión del Pipeline CRM
@@ -263,7 +266,7 @@ export function Dashboard({ leads }: DashboardProps) {
               <span className="w-16 text-right font-semibold text-slate-500 text-[10px] uppercase">Aprobados</span>
               <div className="flex-1 bg-slate-100 h-5 border border-slate-200/30 rounded-lg overflow-hidden relative">
                 <div 
-                  className="bg-teal-850/90 h-full flex items-center px-2.5 text-white font-bold text-[10px]" 
+                  className="bg-ink-800/90 h-full flex items-center px-2.5 text-white font-bold text-[10px]"
                   style={{ width: `${Math.max(12, (pipelineStats.aprobado / totalLeads) * 100)}%` }}
                 >
                   {pipelineStats.aprobado}

@@ -104,18 +104,24 @@ export default function AdminPanel() {
 
   if (isLoading) {
     return (
-      <div className="flex flex-col items-center justify-center p-12 bg-white rounded-3xl border border-slate-100 shadow-sm min-h-[450px]">
-        <Loader2 className="animate-spin text-teal-600 mb-4" size={36} />
+      <div className="flex flex-col items-center justify-center p-12 product-panel-raised min-h-[450px]">
+        <Loader2 className="animate-spin text-ink-600 mb-4" size={36} />
         <p className="text-slate-500 font-semibold tracking-wide text-sm uppercase">Cargando datos de administración...</p>
       </div>
     );
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 font-body">
+      <div>
+        <p className="section-kicker mb-2">Control operativo</p>
+        <h2 className="text-2xl font-bold text-slate-900">Panel de administración</h2>
+        <p className="text-xs text-slate-400 font-medium mt-1">Seguimiento consolidado de asesores, actividad y oportunidades comerciales.</p>
+      </div>
+
       {/* Top Cards KPIs */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-5">
-        <div className="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm flex items-center justify-between">
+        <div className="metric-card p-5 flex items-center justify-between">
           <div>
             <p className="text-[10px] uppercase tracking-wider text-slate-400 font-bold">Asesores Activos</p>
             <h3 className="text-2xl font-black text-slate-800 mt-1">{totalAdvisors}</h3>
@@ -125,7 +131,7 @@ export default function AdminPanel() {
           </div>
         </div>
 
-        <div className="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm flex items-center justify-between">
+        <div className="metric-card p-5 flex items-center justify-between">
           <div>
             <p className="text-[10px] uppercase tracking-wider text-slate-400 font-bold">Búsquedas Realizadas</p>
             <h3 className="text-2xl font-black text-slate-800 mt-1">{totalSearches}</h3>
@@ -135,7 +141,7 @@ export default function AdminPanel() {
           </div>
         </div>
 
-        <div className="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm flex items-center justify-between">
+        <div className="metric-card p-5 flex items-center justify-between">
           <div>
             <p className="text-[10px] uppercase tracking-wider text-slate-400 font-bold">Descargas Excel</p>
             <h3 className="text-2xl font-black text-slate-800 mt-1">{totalDownloads}</h3>
@@ -145,7 +151,7 @@ export default function AdminPanel() {
           </div>
         </div>
 
-        <div className="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm flex items-center justify-between">
+        <div className="metric-card p-5 flex items-center justify-between">
           <div>
             <p className="text-[10px] uppercase tracking-wider text-slate-400 font-bold">Leads Identificados</p>
             <h3 className="text-2xl font-black text-slate-800 mt-1">{totalLeads}</h3>
@@ -157,8 +163,8 @@ export default function AdminPanel() {
       </div>
 
       {/* Tabs and Refresh Header */}
-      <div className="bg-white p-4 rounded-2xl border border-slate-100 shadow-sm flex flex-col md:flex-row justify-between items-center gap-4">
-        <div className="flex bg-slate-100 p-1.5 rounded-xl w-full md:w-auto">
+      <div className="product-panel p-4 flex flex-col md:flex-row justify-between items-center gap-4">
+        <div className="flex surface-subtle p-1.5 rounded-xl w-full md:w-auto overflow-x-auto">
           <button
             onClick={() => { setActiveTab("advisors"); setSearchQuery(""); }}
             className={`flex-1 md:flex-initial px-4 py-2 text-xs font-bold rounded-lg transition-all flex items-center justify-center gap-2 cursor-pointer ${
@@ -196,7 +202,7 @@ export default function AdminPanel() {
 
         <button
           onClick={loadData}
-          className="w-full md:w-auto border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold py-2 px-4 rounded-xl transition-all flex items-center justify-center gap-2 cursor-pointer shadow-sm"
+          className="secondary-action w-full md:w-auto text-xs font-semibold py-2.5 px-4 rounded-xl flex items-center justify-center gap-2 cursor-pointer"
         >
           <RefreshCw size={12} />
           Actualizar Panel
@@ -204,7 +210,7 @@ export default function AdminPanel() {
       </div>
 
       {/* Main View Area */}
-      <div className="bg-white rounded-3xl border border-slate-100 shadow-sm overflow-hidden">
+      <div className="product-panel-raised overflow-hidden">
         
         {/* Table Filter Headers for Activity and Leads */}
         {activeTab !== "advisors" && (
@@ -216,7 +222,7 @@ export default function AdminPanel() {
                 placeholder={activeTab === "activity" ? "Buscar por usuario o detalle..." : "Buscar pyme, zona o asesor..."}
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full bg-white border border-slate-200 rounded-xl py-2.5 pl-10 pr-4 text-xs focus:outline-none focus:border-teal-500 focus:ring-1 focus:ring-teal-500 transition-all placeholder-slate-400 font-medium"
+                className="control-field py-2.5 pl-10 pr-4 text-xs placeholder:text-slate-400 font-medium"
               />
             </div>
 
@@ -226,7 +232,7 @@ export default function AdminPanel() {
                 <select
                   value={actionFilter}
                   onChange={(e) => setActionFilter(e.target.value)}
-                  className="bg-white border border-slate-200 rounded-xl py-2 px-3 text-xs focus:outline-none focus:border-teal-500 transition-all font-semibold text-slate-700 shadow-sm"
+                  className="control-field py-2.5 px-3 text-xs font-semibold min-w-[220px]"
                 >
                   <option value="ALL">Todas las acciones</option>
                   <option value="LOGIN">Inicios de sesión (LOGIN)</option>
@@ -241,7 +247,7 @@ export default function AdminPanel() {
         {/* Tab 1: Advisors Metrics */}
         {activeTab === "advisors" && (
           <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs border-collapse">
+            <table className="w-full text-left text-xs border-collapse data-table">
               <thead>
                 <tr className="uppercase tracking-wider opacity-60 border-b border-slate-100 bg-slate-50/50 text-[10px] font-bold text-slate-600">
                   <th className="p-4 pl-6">Asesor</th>
@@ -298,7 +304,7 @@ export default function AdminPanel() {
         {/* Tab 2: Activity Logs */}
         {activeTab === "activity" && (
           <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs border-collapse">
+            <table className="w-full text-left text-xs border-collapse data-table">
               <thead>
                 <tr className="uppercase tracking-wider opacity-60 border-b border-slate-100 bg-slate-50/50 text-[10px] font-bold text-slate-600">
                   <th className="p-4 pl-6">Fecha / Hora</th>
@@ -353,7 +359,7 @@ export default function AdminPanel() {
         {/* Tab 3: CRM Leads (All advisors) */}
         {activeTab === "leads" && (
           <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs border-collapse">
+            <table className="w-full text-left text-xs border-collapse data-table">
               <thead>
                 <tr className="uppercase tracking-wider opacity-60 border-b border-slate-100 bg-slate-50/50 text-[10px] font-bold text-slate-600">
                   <th className="p-4 pl-6">Pyme / Negocio</th>

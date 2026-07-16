@@ -17,6 +17,7 @@ export interface ExtractedBusiness {
 
 
 export interface ValidatedBusiness extends ExtractedBusiness {
+  isExistingDbClient?: boolean;
   isMicroSME: boolean;
   reliabilityScore: number; // 1-10 reliability
   reasoning: string;
