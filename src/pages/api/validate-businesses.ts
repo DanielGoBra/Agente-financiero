@@ -1,6 +1,49 @@
 import type { APIRoute } from 'astro';
 import { env } from 'cloudflare:workers';
 
+// System Prompt V2 — Agente Experto en Inteligencia Comercial Inklusiva S.A.S.
+const SYSTEM_PROMPT = `**Rol:**
+Eres un Agente Experto en Inteligencia Comercial y Riesgo de Microfinanzas para Inklusiva S.A.S. Tu misión es analizar resultados de la API de Google Places y perfilar EXCLUSIVAMENTE a las Micro, Pequeñas y Medianas Empresas (MiPymes), negocios de barrio y talleres independientes que representan clientes potenciales para microcréditos de capital de trabajo, compra de inventario o maquinaria.
+
+**1. Matriz de Búsqueda y Clasificación (Terminología Local Colombia):**
+Cuando analices lugares, clasifica bajo estos términos clave que denotan independencia comercial:
+* **Manufactura:** satélite de confección, bordados, taller de estampado, clínica de ropa, dotaciones, ebanistería, carpintería, tapicería, restauración de muebles, fabricación de estibas, soldadura, ornamentación, tornería, cerrajería, rejas y estructuras, fundiciones, marroquinería, talabarterías, reparación de calzado, fábrica de arepas/empanadas, pulpas de fruta, tostadoras de café, queseras, productos de limpieza artesanales.
+* **Comercio (Alimentos/Consumo):** granero, minimercado independiente, legumbrería, fruver, carnicería, salsamentaria, pollería, distribuidora de huevos, depósito de víveres, cacharrería, miscelánea, piñatería, pañalera, distribuidora de plásticos/desechables, cigarrería.
+* **Comercio (Insumos):** ferretería de barrio, depósito de materiales, vidriería, marquetería, vivero, agroveterinaria, papelería, café internet, accesorios para celulares, reparación de computadores, boutique independiente, almacén de calzado local.
+* **Servicios (Automotriz):** montallantas, taller de motos, taller de carros, serviteca, lavadero de carros/motos, latonería, pintura automotriz, venta de lujos y repuestos para motos, centros de diagnóstico (CDA pequeños).
+* **Servicios (Estética/Personal):** barbería, peluquería, spa de uñas, centro de estética de barrio.
+* **Servicios (Otros):** litografía, centro de impresión, tipografía, taller de avisos publicitarios, reparación de electrodomésticos, plomería con local, refrigeración comercial.
+* **Economía Circular:** chatarrería, centro de acopio de reciclaje (excelentes pagadores por alto flujo de efectivo).
+* **Gastronomía Local:** restaurante de "corrientazo", asadero de carne/pollo, pizzería local, repostería, panadería con hornos propios, puestos fijos de comidas rápidas.
+
+**2. Filtro Anti-Bancarizados y Cadenas (Reglas de Exclusión Estricta):**
+Marca isMicroSME=false e opportunityScore=0 INMEDIATAMENTE si el nombre (o variación) contiene:
+* Supermercados/Descuento: "D1", "Ara", "Ísimo", "Éxito", "Carulla", "Surtimax", "Oxxo", "Jumbo", "Metro", "Makro", "Homecenter", "Dollarcity", "Justo & Bueno".
+* Farmacias de cadena: "Farmatodo", "La Rebaja", "Pasteur", "Cruz Verde", "Audifarma", "Comfama".
+* Infraestructura/Corporativo: Bancos (Bancolombia, BBVA, Davivienda, etc.), cajeros ATM, colegios públicos, universidades, hospitales, clínicas, estaciones de gasolina (Terpel, Primax, Texaco), entidades gubernamentales, iglesias, McDonald's, Subway, KFC, Starbucks, franquicias internacionales.
+
+**3. Motor de Calificación (Score de Viabilidad — opportunityScore 0-100):**
+* Puntaje Base: 40 puntos para todo negocio que pase el filtro.
+* +25 puntos: Producción/Manufactura, Ferretería, Carnicería, Chatarrería, Metalmecánica (alta necesidad de liquidez/maquinaria).
+* +15 puntos: Comercio de Barrio (graneros, legumbrerías, misceláneas) o Automotriz (flujo de caja diario).
+* +20 puntos: Si el registro tiene un número de teléfono público válido (contactabilidad para gestión comercial).
+* -30 puntos: Si está marcado como "cerrado temporalmente" o no tiene ningún método de contacto (ni web, ni teléfono). Mínimo 0.
+
+**4. Inferencia de Necesidad Financiera (predictedNeed):**
+Deduce en español la necesidad crediticia más probable:
+* Ferreterías, tiendas, graneros → "Compra de inventario"
+* Talleres de confección, soldadura → "Compra de maquinaria"
+* Ebanisterías, carpinterías → "Compra de materia prima y herramientas"
+* Restaurantes, panaderías → "Capital de trabajo y adecuación de local"
+* Talleres de motos/carros → "Compra de repuestos e insumos"
+* Peluquerías, barberías → "Maquinaria y herramientas especializadas"
+* Chatarrerías, reciclaje → "Capital de trabajo para compra de material"
+* Carnicerías, pollerías → "Capital de trabajo e inventario refrigerado"
+* Minimercados independientes → "Compra de inventario y ampliación de surtido"
+
+**5. Formato de Salida Obligatorio (JSON Estricto):**
+Tu ÚNICA respuesta debe ser un objeto JSON válido. No generes texto conversacional, saludos, markdown ni explicaciones. Solo el JSON:`;
+
 export const POST: APIRoute = async ({ request }) => {
   const getEnv = (key: string): string => {
     return (env as any)[key] || '';
@@ -37,50 +80,39 @@ export const POST: APIRoute = async ({ request }) => {
 
     console.log(`Validando ${businesses.length} negocios con OpenRouter (${openrouterModel})...`);
         
-    const prompt = `
-Eres un agente inteligente de riesgo de crédito y captación de clientes PYME para una Fintech en Colombia.
-Tengo una lista de negocios extraídos de Google Maps.
-Tu objetivo es evaluar detalladamente cada negocio y clasificarlo para nuestro pipeline de ventas.
+    const userPrompt = `Analiza la siguiente lista de negocios extraídos de Google Maps y evalúa cada uno según las reglas del sistema. 
 
-Reglas de clasificación:
-1. Filtra y marca 'isMicroSME' como FALSE para grandes corporaciones, franquicias multinacionales, cadenas nacionales (ej. Éxito, Bancolombia, McDonald's, D1, Ara, Justo & Bueno, Farmatodo, etc.) y oficinas corporativas.
-2. Identifica si es micro, pequeña o mediana empresa (MIPYME) local o independiente.
-3. Evalúa la oportunidad crediticia ('opportunityScore' de 1 a 100):
-   - Negocios estables con flujo de caja diario (ej. restaurantes, panaderías, tiendas de barrio, talleres, ferreterías) tienen alta oportunidad (80-100).
-   - Negocios muy nuevos o sin reseñas tienen menor puntuación (30-60).
-   - Los no-pymes obtienen 0.
-4. Identifica su necesidad financiera típica en español:
-   - Ferreterías, tiendas: 'Compra de inventario'
-   - Talleres de motos, peluquerías: 'Maquinaria y herramientas'
-   - Restaurantes, panaderías: 'Adecuación de local' o 'Capital de trabajo'
-   - En general, deduce según el tipo de negocio.
-5. Determina la huella digital ('low' si no tiene website y tiene pocas reseñas, 'medium' si tiene buena cantidad de reseñas, 'high' si tiene website propio y alta interacción).
-
-IMPORTANTE: El campo 'reasoning' debe ser redactado en Español de forma muy breve e ilustrativa.
-
-Debes retornar obligatoriamente un objeto JSON que contenga un arreglo 'validations' con el siguiente formato exacto por cada negocio (NO devuelvas ninguna introducción o texto adicional, solo el objeto JSON):
+Retorna un JSON con la siguiente estructura EXACTA (sin texto adicional):
 {
   "validations": [
     {
-      "id": "id_del_negocio",
+      "id": "id_del_negocio_original",
       "isMicroSME": true o false,
-      "reliabilityScore": entero del 1 al 10,
-      "reasoning": "Explicación breve en español",
-      "opportunityScore": entero del 1 al 100,
-      "estimatedSize": "micro" o "small" o "medium",
-      "predictedNeed": "Detalle de necesidad financiera en español",
-      "digitalFootprint": "low" o "medium" o "high"
+      "reliabilityScore": entero del 1 al 10 (confiabilidad del dato: 8-10 si tiene teléfono+reseñas, 4-6 si tiene poca info, 1-3 si casi no hay datos),
+      "reasoning": "Frase breve en español explicando el perfil del negocio y por qué es o no es prospecto viable. Incluir la actividad específica detectada.",
+      "opportunityScore": entero del 0 al 100 (según el Motor de Calificación del sistema),
+      "estimatedSize": "micro" o "small" o "medium" (micro: 1-5 empleados estimados, small: 6-20, medium: 21-50),
+      "predictedNeed": "Necesidad financiera inferida en español según las reglas del sistema",
+      "digitalFootprint": "low" o "medium" o "high" (low: sin web ni reseñas, medium: tiene reseñas, high: tiene web propia y buena presencia)
     }
   ]
 }
 
-Por favor evalúa cada negocio en esta lista:
+REGLAS CRÍTICAS:
+- Para cadenas, franquicias y corporaciones: isMicroSME=false, opportunityScore=0
+- El campo "reasoning" DEBE estar en español y ser descriptivo (ej: "Granero de barrio con flujo de caja diario, ideal para microcrédito de inventario")
+- Usa la terminología local colombiana para identificar tipos de negocio
+- Si no puedes determinar el tipo exacto, infiere por el nombre y la dirección
+
+Negocios a evaluar:
 ${JSON.stringify(businesses.map((b: any) => ({
   id: b.id,
   name: b.name,
   types: b.types,
   website: b.website,
   rating: b.rating,
+  userRatingsTotal: b.userRatingsTotal,
+  phone: b.phone,
   address: b.address
 })), null, 2)}`;
 
@@ -90,16 +122,16 @@ ${JSON.stringify(businesses.map((b: any) => ({
         "Authorization": `Bearer ${openrouterKey}`,
         "Content-Type": "application/json",
         "HTTP-Referer": "https://agente-financiero.danelgomez-mgvc.workers.dev",
-        "X-Title": "Agente Financiero PYME"
+        "X-Title": "Agente Financiero PYME - Inklusiva S.A.S."
       },
       body: JSON.stringify({
         model: openrouterModel,
         messages: [
-          { role: "system", content: "Eres un analista de datos experto y asistente de riesgo que devuelve solo formato JSON conforme a las especificaciones dadas." },
-          { role: "user", content: prompt }
+          { role: "system", content: SYSTEM_PROMPT },
+          { role: "user", content: userPrompt }
         ],
         response_format: { type: "json_object" },
-        temperature: 0.2
+        temperature: 0.15
       })
     });
 
