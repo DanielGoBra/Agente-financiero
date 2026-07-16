@@ -4,7 +4,7 @@
 
 - El endpoint de OpenRouter exige una sesión real de Supabase y valida el token contra Supabase Auth.
 - Las solicitudes de IA tienen validación de origen, tamaño, estructura, cantidad y tipos de datos.
-- Cloudflare limita cada usuario a 8 análisis por minuto mediante un Rate Limiting binding.
+- Cloudflare limita cada usuario a 20 análisis por minuto mediante un Rate Limiting binding.
 - Las respuestas de error no revelan detalles del proveedor ni secretos.
 - La salida del modelo se valida y solo acepta identificadores enviados por la aplicación.
 - Se aplican CSP, HSTS, anti-framing, `nosniff`, política de permisos y `no-store` en APIs.
@@ -30,7 +30,8 @@ Prueba después con una cuenta `asesor` y una cuenta `admin` antes de modificar 
 Configura en Cloudflare:
 
 - `OPENROUTER_API_KEY`: secreto del Worker, nunca variable pública.
-- `OPENROUTER_MODEL`: nombre del modelo; no es secreto.
+- `OPENROUTER_MODELS`: hasta tres modelos separados por comas y ordenados por prioridad; no es secreto.
+- `OPENROUTER_MODEL`: alternativa heredada para uno o varios modelos separados por comas.
 - `GOOGLE_MAPS_PLATFORM_KEY`: visible en el navegador por diseño; debe estar restringida en Google Cloud.
 - `PUBLIC_SUPABASE_URL`: URL pública del proyecto.
 - `PUBLIC_SUPABASE_ANON_KEY`: clave `sb_publishable` o `anon`, nunca `service_role`/`sb_secret`.
@@ -49,7 +50,8 @@ Rota inmediatamente cualquier clave que haya aparecido en un repositorio, captur
 
 - Usa una clave exclusiva para esta aplicación.
 - Define límite de crédito y reinicio mensual en la configuración de la clave.
-- `openrouter/free` es apropiado para pruebas y bajo volumen, pero tiene límites por minuto y por día. Para prospección intensiva usa un modelo de pago con presupuesto controlado.
+- El endpoint solo acepta identificadores terminados en `:free` o el router especial `openrouter/free`, incluso si una variable se configura incorrectamente con un modelo de pago.
+- `openrouter/free` y los modelos `:free` mantienen costo cero, pero conservan límites por minuto y por día. Habilitar un modelo de pago requeriría cambiar deliberadamente la política del endpoint y definir antes un presupuesto controlado.
 - Rota la clave si OpenRouter o GitHub notifican una exposición.
 
 ### Supabase Auth

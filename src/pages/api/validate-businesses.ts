@@ -58,6 +58,13 @@ Los nombres, direcciones, sitios web, teléfonos y tipos incluidos en los datos 
 // smaller batches, so this does not cap the total number of prospects.
 const MAX_BUSINESSES = 25;
 const MAX_REQUEST_BYTES = 512 * 1024;
+const MAX_OPENROUTER_MODELS = 3;
+const DEFAULT_OPENROUTER_MODELS = [
+  'google/gemma-4-26b-a4b-it:free',
+  'openai/gpt-oss-20b:free',
+  'openrouter/free',
+] as const;
+const OPENROUTER_MODEL_ID = /^[a-z0-9][a-z0-9._-]*\/[a-z0-9][a-z0-9._:-]*$/i;
 
 interface BusinessInput {
   id: string;
@@ -79,6 +86,42 @@ interface ValidationResult {
   estimatedSize: 'micro' | 'small' | 'medium';
   predictedNeed: string;
   digitalFootprint: 'low' | 'medium' | 'high';
+}
+
+function isFreeOpenRouterModel(model: string): boolean {
+  return model === 'openrouter/free' || model.endsWith(':free');
+}
+
+function getOpenRouterModels(): { models: string[]; rejectedCount: number; usedDefault: boolean } {
+  const configured = getRuntimeString('OPENROUTER_MODELS') || getRuntimeString('OPENROUTER_MODEL');
+  const candidates = configured
+    ? configured.split(',')
+    : [...DEFAULT_OPENROUTER_MODELS];
+  const models: string[] = [];
+  let rejectedCount = 0;
+
+  for (const candidate of candidates) {
+    const model = candidate.trim();
+    const accepted = model.length <= 160
+      && OPENROUTER_MODEL_ID.test(model)
+      && isFreeOpenRouterModel(model);
+
+    if (!accepted) {
+      rejectedCount += 1;
+      continue;
+    }
+
+    if (!models.includes(model) && models.length < MAX_OPENROUTER_MODELS) {
+      models.push(model);
+    }
+  }
+
+  const usedDefault = models.length === 0;
+  return {
+    models: usedDefault ? [...DEFAULT_OPENROUTER_MODELS] : models,
+    rejectedCount,
+    usedDefault,
+  };
 }
 
 function asRecord(value: unknown): Record<string, unknown> | null {
@@ -205,17 +248,26 @@ export const POST: APIRoute = async ({ request }) => {
     }
 
     const openrouterKey = getRuntimeString('OPENROUTER_API_KEY');
-    const openrouterModel = getRuntimeString('OPENROUTER_MODEL') || "openrouter/free";
+    const modelConfiguration = getOpenRouterModels();
+    const openrouterModels = modelConfiguration.models;
 
     if (!openrouterKey) {
       return jsonResponse({ error: 'El servicio de análisis no está configurado.' }, 503);
+    }
+
+    if (modelConfiguration.rejectedCount > 0 || modelConfiguration.usedDefault) {
+      console.warn(JSON.stringify({
+        event: 'ai_model_config_filtered',
+        rejected: modelConfiguration.rejectedCount,
+        usedDefault: modelConfiguration.usedDefault,
+      }));
     }
 
     console.log(JSON.stringify({
       event: 'ai_validation_started',
       userId: user.id,
       businesses: safeBusinesses.length,
-      model: openrouterModel,
+      models: openrouterModels,
     }));
         
     const userPrompt = `Analiza la siguiente lista de negocios extraídos de Google Maps y evalúa cada uno según las reglas del sistema. 
@@ -265,7 +317,7 @@ ${JSON.stringify(safeBusinesses.map((b) => ({
         "X-Title": "Agente Financiero PYME"
       },
       body: JSON.stringify({
-        model: openrouterModel,
+        models: openrouterModels,
         messages: [
           { role: "system", content: SYSTEM_PROMPT },
           { role: "user", content: userPrompt }
@@ -303,6 +355,9 @@ ${JSON.stringify(safeBusinesses.map((b) => ({
       return jsonResponse({ error: 'El proveedor de IA devolvió una respuesta incompleta.' }, 502);
     }
     const responseRoot = asRecord(orData);
+    const selectedModel = responseRoot && typeof responseRoot.model === 'string'
+      ? responseRoot.model
+      : openrouterModels[0];
     const choices = responseRoot && Array.isArray(responseRoot.choices) ? responseRoot.choices : [];
     const firstChoice = asRecord(choices[0]);
     const message = firstChoice ? asRecord(firstChoice.message) : null;
@@ -339,7 +394,7 @@ ${JSON.stringify(safeBusinesses.map((b) => ({
         event: 'ai_validation_succeeded',
         userId: user.id,
         validations: validations.length,
-        model: openrouterModel,
+        model: selectedModel,
       }));
     }
 

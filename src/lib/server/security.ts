@@ -1,12 +1,13 @@
 import { env } from "cloudflare:workers";
 
-type AdditionalPublicEnv = Partial<{
+type AdditionalRuntimeEnv = Partial<{
   PUBLIC_SUPABASE_URL: string;
   PUBLIC_SUPABASE_ANON_KEY: string;
   SUPABASE_ANON_KEY: string;
+  OPENROUTER_MODELS: string;
 }>;
 
-type RuntimeEnv = Cloudflare.Env & AdditionalPublicEnv;
+type RuntimeEnv = Cloudflare.Env & AdditionalRuntimeEnv;
 type StringEnvKey = Exclude<{
   [Key in keyof RuntimeEnv]: RuntimeEnv[Key] extends string | undefined ? Key : never;
 }[keyof RuntimeEnv], undefined>;
