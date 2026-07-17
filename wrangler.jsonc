@@ -6,12 +6,28 @@
 		"nodejs_compat"
 	],
 	"name": "agente-financiero",
+	"main": "./src/worker.ts",
+	"workflows": [
+		{
+			"name": "crm-prospecting-workflow",
+			"binding": "CRM_PROSPECTING_WORKFLOW",
+			"class_name": "ProspectingWorkflow"
+		}
+	],
 	"ratelimits": [
 		{
 			"name": "API_RATE_LIMITER",
 			"namespace_id": "17071601",
 			"simple": {
 				"limit": 20,
+				"period": 60
+			}
+		},
+		{
+			"name": "CRM_WORKFLOW_RATE_LIMITER",
+			"namespace_id": "17071703",
+			"simple": {
+				"limit": 2,
 				"period": 60
 			}
 		}

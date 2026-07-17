@@ -154,3 +154,19 @@ export async function consumeApiRateLimit(userId: string): Promise<boolean> {
     return false;
   }
 }
+
+export async function consumeProspectingWorkflowRateLimit(userId: string): Promise<boolean> {
+  const limiter = runtimeEnv.CRM_WORKFLOW_RATE_LIMITER;
+  if (!limiter) return false;
+
+  try {
+    const result = await limiter.limit({ key: `prospecting-workflow:${userId}` });
+    return result.success;
+  } catch (error) {
+    console.error(JSON.stringify({
+      event: "prospecting_workflow_rate_limit_error",
+      message: error instanceof Error ? error.message : "unknown",
+    }));
+    return false;
+  }
+}

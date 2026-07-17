@@ -9,7 +9,7 @@ import {
 } from '../../lib/server/security';
 
 // System Prompt V2 — Agente Experto en Inteligencia Comercial PYME
-const SYSTEM_PROMPT = `**Rol:**
+export const SYSTEM_PROMPT = `**Rol:**
 Eres un Agente Experto en Inteligencia Comercial y Riesgo de Microfinanzas. Tu misión es analizar resultados de la API de Google Places y perfilar EXCLUSIVAMENTE a las Micro, Pequeñas y Medianas Empresas (MiPymes), negocios de barrio y talleres independientes que representan clientes potenciales para microcréditos de capital de trabajo, compra de inventario o maquinaria.
 
 **1. Matriz de Búsqueda y Clasificación (Terminología Local Colombia):**
@@ -66,7 +66,7 @@ const DEFAULT_OPENROUTER_MODELS = [
 ] as const;
 const OPENROUTER_MODEL_ID = /^[a-z0-9][a-z0-9._-]*\/[a-z0-9][a-z0-9._:-]*$/i;
 
-interface BusinessInput {
+export interface BusinessInput {
   id: string;
   name: string;
   types: string[];
@@ -77,7 +77,7 @@ interface BusinessInput {
   address: string;
 }
 
-interface ValidationResult {
+export interface ValidationResult {
   id: string;
   isMicroSME: boolean;
   reliabilityScore: number;
@@ -139,7 +139,7 @@ function boundedNumber(value: unknown, minimum: number, maximum: number): number
   return Math.min(maximum, Math.max(minimum, number));
 }
 
-function normalizeBusiness(value: unknown): BusinessInput | null {
+export function normalizeBusiness(value: unknown): BusinessInput | null {
   const item = asRecord(value);
   if (!item) return null;
 
@@ -164,7 +164,7 @@ function normalizeBusiness(value: unknown): BusinessInput | null {
   };
 }
 
-function normalizeValidations(value: unknown, allowedIds: Set<string>): ValidationResult[] {
+export function normalizeValidations(value: unknown, allowedIds: Set<string>): ValidationResult[] {
   const root = asRecord(value);
   const candidates = Array.isArray(value)
     ? value

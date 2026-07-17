@@ -1,5 +1,19 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { UserProfile, ValidatedBusiness } from "../types";
+import type {
+  CRMAccount,
+  CRMActivity,
+  CRMActivityType,
+  CRMContact,
+  CRMConsentStatus,
+  CRMPipelineStage,
+  CRMPriority,
+  CRMStageHistory,
+  CRMTask,
+  CRMTaskStatus,
+  CRMWorkspace,
+} from "../types/crm";
+import { legacyStatusToCRMStage } from "./crmMappings";
 
 let supabaseClient: SupabaseClient | null = null;
 
@@ -7,6 +21,116 @@ function inferDigitalFootprint(website: unknown, phone: unknown): ValidatedBusin
   if (typeof website === "string" && website.trim()) return "high";
   if (typeof phone === "string" && phone.trim()) return "medium";
   return "low";
+}
+
+function isProfessionalCRMUnavailable(error: { code?: string; message?: string } | null): boolean {
+  if (!error) return false;
+  return ["42P01", "PGRST204", "PGRST205"].includes(error.code || "")
+    || /crm_(accounts|pipeline_stages|contacts)/i.test(error.message || "")
+      && /not found|does not exist|schema cache/i.test(error.message || "");
+}
+
+function asString(value: unknown): string {
+  return typeof value === "string" ? value : "";
+}
+
+function mapPipelineStage(row: any): CRMPipelineStage {
+  return {
+    id: asString(row.id),
+    name: asString(row.name),
+    pipeline: row.pipeline,
+    position: Number(row.position || 0),
+    probability: Number(row.probability || 0),
+    isTerminal: Boolean(row.is_terminal),
+    isActive: Boolean(row.is_active),
+  };
+}
+
+function mapCRMAccount(row: any): CRMAccount {
+  return {
+    id: asString(row.id),
+    legacyEmpresaId: row.legacy_empresa_id === null ? null : Number(row.legacy_empresa_id),
+    googlePlaceId: row.google_place_id || null,
+    ownerId: row.owner_id || null,
+    createdBy: row.created_by || null,
+    stageId: asString(row.stage_id) || "capturado",
+    displayName: asString(row.display_name) || "Sin nombre",
+    municipality: asString(row.municipality),
+    address: asString(row.address),
+    phone: asString(row.phone),
+    website: asString(row.website),
+    source: asString(row.source),
+    priority: row.priority,
+    enrichmentStatus: row.enrichment_status,
+    dataConfidence: row.data_confidence === null ? null : Number(row.data_confidence),
+    nextActionAt: row.next_action_at || null,
+    lastContactedAt: row.last_contacted_at || null,
+    createdAt: asString(row.created_at),
+    updatedAt: asString(row.updated_at),
+  };
+}
+
+function mapCRMTask(row: any): CRMTask {
+  return {
+    id: asString(row.id),
+    accountId: asString(row.account_id),
+    assignedTo: row.assigned_to || null,
+    createdBy: asString(row.created_by),
+    title: asString(row.title),
+    description: asString(row.description),
+    priority: row.priority,
+    status: row.status,
+    dueAt: row.due_at || null,
+    completedAt: row.completed_at || null,
+    createdAt: asString(row.created_at),
+    updatedAt: asString(row.updated_at),
+  };
+}
+
+function mapCRMActivity(row: any): CRMActivity {
+  return {
+    id: asString(row.id),
+    accountId: asString(row.account_id),
+    createdBy: asString(row.created_by),
+    activityType: row.activity_type,
+    subject: asString(row.subject),
+    body: asString(row.body),
+    occurredAt: asString(row.occurred_at),
+    createdAt: asString(row.created_at),
+  };
+}
+
+function mapCRMContact(row: any): CRMContact {
+  return {
+    id: asString(row.id),
+    accountId: asString(row.account_id),
+    createdBy: asString(row.created_by),
+    fullName: asString(row.full_name),
+    jobTitle: asString(row.job_title),
+    phone: asString(row.phone),
+    email: asString(row.email),
+    isPrimary: Boolean(row.is_primary),
+    isActive: Boolean(row.is_active),
+    consentStatus: row.consent_status,
+    createdAt: asString(row.created_at),
+    updatedAt: asString(row.updated_at),
+  };
+}
+
+function mapCRMStageHistory(row: any): CRMStageHistory {
+  return {
+    id: asString(row.id),
+    accountId: asString(row.account_id),
+    changedBy: asString(row.changed_by),
+    fromStageId: row.from_stage_id || null,
+    toStageId: asString(row.to_stage_id),
+    reason: asString(row.reason),
+    createdAt: asString(row.created_at),
+  };
+}
+
+function legacyNumericId(id: string): number | null {
+  return /^\d+$/.test(id) ? Number(id) : null;
 }
 
 export function initSupabase(url: string, key: string) {
@@ -147,6 +271,258 @@ export const databaseService = {
         .from("user_zones")
         .insert(inserts);
     }
+  },
+
+  async prepareProfessionalCRM(userId: string, leads: ValidatedBusiness[]): Promise<CRMWorkspace> {
+    if (!supabaseClient) {
+      return { available: false, accounts: [], stages: [], tasks: [] };
+    }
+
+    const [stagesResult, contactsResult] = await Promise.all([
+      supabaseClient
+        .from("crm_pipeline_stages")
+        .select("id, name, pipeline, position, probability, is_terminal, is_active")
+        .eq("is_active", true)
+        .order("position", { ascending: true }),
+      supabaseClient
+        .from("crm_contacts")
+        .select("id", { head: true, count: "exact" })
+        .limit(1),
+    ]);
+
+    if (isProfessionalCRMUnavailable(stagesResult.error) || isProfessionalCRMUnavailable(contactsResult.error)) {
+      return { available: false, accounts: [], stages: [], tasks: [] };
+    }
+    if (stagesResult.error) throw new Error(`No se pudo cargar el pipeline profesional: ${stagesResult.error.message}`);
+    if (contactsResult.error) throw new Error(`No se pudo validar el módulo de contactos: ${contactsResult.error.message}`);
+
+    const { data: currentRows, error: accountsError } = await supabaseClient
+      .from("crm_accounts")
+      .select("*")
+      .order("updated_at", { ascending: false });
+
+    if (isProfessionalCRMUnavailable(accountsError)) {
+      return { available: false, accounts: [], stages: [], tasks: [] };
+    }
+    if (accountsError) throw new Error(`No se pudieron cargar las empresas CRM: ${accountsError.message}`);
+
+    const currentAccounts = (currentRows || []).map(mapCRMAccount);
+    const existingLegacyIds = new Set(
+      currentAccounts
+        .map(account => account.legacyEmpresaId)
+        .filter((id): id is number => id !== null)
+    );
+    const existingPlaceIds = new Set(
+      currentAccounts
+        .map(account => account.googlePlaceId)
+        .filter((id): id is string => Boolean(id))
+    );
+
+    const missingAccounts = leads
+      .filter(lead => {
+        const numericId = legacyNumericId(lead.id);
+        return numericId !== null
+          ? !existingLegacyIds.has(numericId)
+          : !existingPlaceIds.has(lead.id);
+      })
+      .map(lead => {
+        const numericId = legacyNumericId(lead.id);
+        const hasAIAnalysis = Boolean(lead.reasoning)
+          && !lead.reasoning.toLowerCase().includes("no disponible");
+
+        return {
+          legacy_empresa_id: numericId,
+          google_place_id: numericId === null ? lead.id : null,
+          owner_id: userId,
+          created_by: userId,
+          stage_id: legacyStatusToCRMStage(lead.crmStatus),
+          display_name: lead.name,
+          municipality: lead.municipality || null,
+          address: lead.address || null,
+          phone: lead.phone || null,
+          website: lead.website || null,
+          source: numericId === null ? "google_places" : "database",
+          priority: lead.opportunityScore >= 85 ? "high" : "medium",
+          enrichment_status: hasAIAnalysis ? "enriched" : "pending",
+          data_confidence: Math.max(0, Math.min(100, Math.round(lead.reliabilityScore * 10))),
+        };
+      });
+
+    if (missingAccounts.length > 0) {
+      const { error: insertError } = await supabaseClient
+        .from("crm_accounts")
+        .insert(missingAccounts);
+
+      if (insertError && insertError.code !== "23505") {
+        throw new Error(`No se pudieron preparar los leads para el CRM profesional: ${insertError.message}`);
+      }
+    }
+
+    const [{ data: accountRows, error: reloadError }, { data: taskRows, error: tasksError }] = await Promise.all([
+      supabaseClient
+        .from("crm_accounts")
+        .select("*")
+        .order("updated_at", { ascending: false }),
+      supabaseClient
+        .from("crm_tasks")
+        .select("*")
+        .neq("status", "cancelled")
+        .order("due_at", { ascending: true, nullsFirst: false }),
+    ]);
+
+    if (reloadError) throw new Error(`No se pudieron actualizar las empresas CRM: ${reloadError.message}`);
+    if (tasksError) throw new Error(`No se pudieron cargar las tareas: ${tasksError.message}`);
+
+    return {
+      available: true,
+      accounts: (accountRows || []).map(mapCRMAccount),
+      stages: (stagesResult.data || []).map(mapPipelineStage),
+      tasks: (taskRows || []).map(mapCRMTask),
+    };
+  },
+
+  async getCRMTasks(accountId?: string): Promise<CRMTask[]> {
+    if (!supabaseClient) return [];
+    let query = supabaseClient
+      .from("crm_tasks")
+      .select("*")
+      .neq("status", "cancelled")
+      .order("due_at", { ascending: true, nullsFirst: false });
+    if (accountId) query = query.eq("account_id", accountId);
+    const { data, error } = await query;
+    if (error) throw new Error(`No se pudieron cargar las tareas: ${error.message}`);
+    return (data || []).map(mapCRMTask);
+  },
+
+  async getCRMActivities(accountId: string): Promise<CRMActivity[]> {
+    if (!supabaseClient) return [];
+    const { data, error } = await supabaseClient
+      .from("crm_activities")
+      .select("*")
+      .eq("account_id", accountId)
+      .order("occurred_at", { ascending: false });
+    if (error) throw new Error(`No se pudo cargar la actividad comercial: ${error.message}`);
+    return (data || []).map(mapCRMActivity);
+  },
+
+  async getCRMStageHistory(accountId: string): Promise<CRMStageHistory[]> {
+    if (!supabaseClient) return [];
+    const { data, error } = await supabaseClient
+      .from("crm_stage_history")
+      .select("*")
+      .eq("account_id", accountId)
+      .order("created_at", { ascending: false });
+    if (error) throw new Error(`No se pudo cargar el historial del pipeline: ${error.message}`);
+    return (data || []).map(mapCRMStageHistory);
+  },
+
+  async getCRMContacts(accountId: string): Promise<CRMContact[]> {
+    if (!supabaseClient) return [];
+    const { data, error } = await supabaseClient
+      .from("crm_contacts")
+      .select("*")
+      .eq("account_id", accountId)
+      .eq("is_active", true)
+      .order("is_primary", { ascending: false })
+      .order("created_at", { ascending: true });
+    if (error) throw new Error(`No se pudieron cargar los contactos: ${error.message}`);
+    return (data || []).map(mapCRMContact);
+  },
+
+  async updateCRMAccountStage(accountId: string, stageId: string): Promise<void> {
+    if (!supabaseClient) return;
+    const { error } = await supabaseClient
+      .from("crm_accounts")
+      .update({ stage_id: stageId })
+      .eq("id", accountId);
+    if (error) throw new Error(`No se pudo actualizar la etapa: ${error.message}`);
+  },
+
+  async createCRMActivity(input: {
+    accountId: string;
+    userId: string;
+    activityType: CRMActivityType;
+    subject?: string;
+    body: string;
+  }): Promise<CRMActivity> {
+    if (!supabaseClient) throw new Error("Servicio de base de datos no inicializado.");
+    const { data, error } = await supabaseClient
+      .from("crm_activities")
+      .insert({
+        account_id: input.accountId,
+        created_by: input.userId,
+        activity_type: input.activityType,
+        subject: input.subject || null,
+        body: input.body,
+      })
+      .select("*")
+      .single();
+    if (error) throw new Error(`No se pudo registrar la actividad: ${error.message}`);
+    return mapCRMActivity(data);
+  },
+
+  async createCRMTask(input: {
+    accountId: string;
+    userId: string;
+    title: string;
+    description?: string;
+    priority: CRMPriority;
+    dueAt?: string;
+  }): Promise<CRMTask> {
+    if (!supabaseClient) throw new Error("Servicio de base de datos no inicializado.");
+    const { data, error } = await supabaseClient
+      .from("crm_tasks")
+      .insert({
+        account_id: input.accountId,
+        assigned_to: input.userId,
+        created_by: input.userId,
+        title: input.title,
+        description: input.description || null,
+        priority: input.priority,
+        due_at: input.dueAt || null,
+      })
+      .select("*")
+      .single();
+    if (error) throw new Error(`No se pudo crear la tarea: ${error.message}`);
+    return mapCRMTask(data);
+  },
+
+  async updateCRMTaskStatus(taskId: string, status: CRMTaskStatus): Promise<void> {
+    if (!supabaseClient) return;
+    const { error } = await supabaseClient
+      .from("crm_tasks")
+      .update({ status })
+      .eq("id", taskId);
+    if (error) throw new Error(`No se pudo actualizar la tarea: ${error.message}`);
+  },
+
+  async createCRMContact(input: {
+    accountId: string;
+    userId: string;
+    fullName: string;
+    jobTitle?: string;
+    phone?: string;
+    email?: string;
+    isPrimary?: boolean;
+    consentStatus?: CRMConsentStatus;
+  }): Promise<CRMContact> {
+    if (!supabaseClient) throw new Error("Servicio de base de datos no inicializado.");
+    const { data, error } = await supabaseClient
+      .from("crm_contacts")
+      .insert({
+        account_id: input.accountId,
+        created_by: input.userId,
+        full_name: input.fullName,
+        job_title: input.jobTitle || null,
+        phone: input.phone || null,
+        email: input.email || null,
+        is_primary: Boolean(input.isPrimary),
+        consent_status: input.consentStatus || "unknown",
+      })
+      .select("*")
+      .single();
+    if (error) throw new Error(`No se pudo crear el contacto: ${error.message}`);
+    return mapCRMContact(data);
   },
 
   async getUserLeads(userId: string): Promise<ValidatedBusiness[]> {

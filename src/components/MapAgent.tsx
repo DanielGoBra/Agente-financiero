@@ -10,7 +10,7 @@ import { ExtractedBusiness, ValidatedBusiness, UserProfile } from "../types";
 import { exportToExcel } from "../lib/exportUtils";
 import { cn } from "../lib/utils";
 import { MapVisualizer } from "./MapVisualizer";
-import { LeadCRM } from "./LeadCRM";
+import { ProfessionalCRM } from "./ProfessionalCRM";
 import { Dashboard } from "./Dashboard";
 import AdminPanel from "./AdminPanel";
 import { authService, databaseService, isDemoActive } from "../lib/supabase";
@@ -100,6 +100,24 @@ interface BusinessValidation {
   digitalFootprint: "low" | "medium" | "high";
 }
 
+interface DurableProspectingCandidate {
+  id: string;
+  status: string;
+  validation: BusinessValidation | null;
+}
+
+interface DurableProspectingStatus {
+  runId: string;
+  status: string;
+  workflowStatus: string;
+  total: number;
+  enriched: number;
+  failed: number;
+  completedBatches: number;
+  totalBatches: number;
+  candidates: DurableProspectingCandidate[];
+}
+
 function getApiError(value: unknown): string | null {
   if (typeof value !== "object" || value === null) return null;
   const error = (value as Record<string, unknown>).error;
@@ -110,6 +128,33 @@ function getValidations(value: unknown): BusinessValidation[] | null {
   if (typeof value !== "object" || value === null) return null;
   const validations = (value as Record<string, unknown>).validations;
   return Array.isArray(validations) ? validations as BusinessValidation[] : null;
+}
+
+function getDurableProspectingStatus(value: unknown): DurableProspectingStatus | null {
+  if (typeof value !== "object" || value === null) return null;
+  const status = value as Record<string, unknown>;
+  if (typeof status.runId !== "string" || typeof status.status !== "string" || !Array.isArray(status.candidates)) return null;
+  const candidates: DurableProspectingCandidate[] = [];
+  for (const rawCandidate of status.candidates) {
+    if (typeof rawCandidate !== "object" || rawCandidate === null) continue;
+    const candidate = rawCandidate as Record<string, unknown>;
+    if (typeof candidate.id !== "string" || typeof candidate.status !== "string") continue;
+    const validation = candidate.validation
+      ? getValidations({ validations: [candidate.validation] })?.[0] || null
+      : null;
+    candidates.push({ id: candidate.id, status: candidate.status, validation });
+  }
+  return {
+    runId: status.runId,
+    status: status.status,
+    workflowStatus: typeof status.workflowStatus === "string" ? status.workflowStatus : "unknown",
+    total: Number(status.total || 0),
+    enriched: Number(status.enriched || 0),
+    failed: Number(status.failed || 0),
+    completedBatches: Number(status.completedBatches || 0),
+    totalBatches: Number(status.totalBatches || 0),
+    candidates,
+  };
 }
 
 export function MapAgent({ currentUser, onLogout, onUserUpdate }: MapAgentProps) {
@@ -450,46 +495,103 @@ export function MapAgent({ currentUser, onLogout, onUserUpdate }: MapAgentProps)
         throw new Error("Tu sesión expiró. Inicia sesión nuevamente para continuar.");
       }
 
-      for (let i = 0; i < allExtracted.length; i += chunkSize) {
-        const chunk = allExtracted.slice(i, i + chunkSize);
-        const currentBatch = Math.floor(i/chunkSize) + 1;
-        const totalBatches = Math.ceil(allExtracted.length/chunkSize);
-        
-        setStatusText(`Analizando lote ${currentBatch} de ${totalBatches}...`);
-        
-        const valRes = await fetchWithRetry("/api/validate-businesses", {
+      const activeZone = usePreset ? selectedPreset : customLocation;
+
+      const validateSequentially = async (businesses: ExtractedBusiness[]): Promise<BusinessValidation[]> => {
+        const fallbackValidations: BusinessValidation[] = [];
+        for (let i = 0; i < businesses.length; i += chunkSize) {
+          const chunk = businesses.slice(i, i + chunkSize);
+          const currentBatch = Math.floor(i / chunkSize) + 1;
+          const totalBatches = Math.ceil(businesses.length / chunkSize);
+          setStatusText(`Analizando lote alterno ${currentBatch} de ${totalBatches}...`);
+
+          const valRes = await fetchWithRetry("/api/validate-businesses", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "Authorization": `Bearer ${accessToken}`,
+            },
+            body: JSON.stringify({ businesses: chunk }),
+          });
+
+          if (!valRes.ok) {
+            const errText = await valRes.text();
+            let errorMessage: string | null = null;
+            try { errorMessage = getApiError(JSON.parse(errText) as unknown); } catch {}
+            if (![402, 429, 500, 502, 503, 504].includes(valRes.status)) {
+              throw new Error(errorMessage || `Fallo en el servidor de IA (Código: ${valRes.status}). Reintenta.`);
+            }
+            console.warn(errorMessage || `Lote alterno ${currentBatch} sin enriquecimiento (${valRes.status}).`);
+          } else {
+            const batchValidations = getValidations(await valRes.json() as unknown);
+            if (batchValidations) fallbackValidations.push(...batchValidations);
+          }
+
+          if (i + chunkSize < businesses.length) await new Promise(resolve => setTimeout(resolve, delayBetweenBatchesMs));
+        }
+        return fallbackValidations;
+      };
+
+      let durableRunStarted = false;
+      try {
+        setStatusText(`Creando análisis durable para ${allExtracted.length} prospectos...`);
+        const startResponse = await fetch("/api/prospecting/start", {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            "Authorization": `Bearer ${accessToken}`,
+            Authorization: `Bearer ${accessToken}`,
           },
-          body: JSON.stringify({ businesses: chunk })
+          body: JSON.stringify({ businesses: allExtracted, territory: activeZone, sector: activeKeyword }),
         });
 
-        if (!valRes.ok) {
-          const errText = await valRes.text();
-          let errorMessage: string | null = null;
-          try { errorMessage = getApiError(JSON.parse(errText) as unknown); } catch {}
-
-          if ([402, 429, 500, 502, 503, 504].includes(valRes.status)) {
-            console.warn(errorMessage || `Lote ${currentBatch} sin enriquecimiento de IA (${valRes.status}).`);
-            setStatusText(`Lote ${currentBatch} sin enriquecimiento de IA. Conservando prospectos y continuando...`);
-          } else {
-            throw new Error(errorMessage || `Fallo en el servidor de IA (Código: ${valRes.status}). Reintenta.`);
-          }
-        } else {
-          const valData = await valRes.json() as unknown;
-          const batchValidations = getValidations(valData);
-          if (batchValidations) {
-            validations = [...validations, ...batchValidations];
-          } else {
-            console.warn(`Lote ${currentBatch} devolvió una respuesta de IA inválida. Se conservarán sus prospectos.`);
-          }
+        if (!startResponse.ok) {
+          const startError = await startResponse.json().catch(() => null) as unknown;
+          throw new Error(getApiError(startError) || `No se pudo iniciar el Workflow (${startResponse.status}).`);
         }
 
-        if (i + chunkSize < allExtracted.length) {
-          await new Promise(r => setTimeout(r, delayBetweenBatchesMs));
+        const startPayload = await startResponse.json() as { runId?: unknown };
+        if (typeof startPayload.runId !== "string") throw new Error("El Workflow no devolvió un identificador válido.");
+        durableRunStarted = true;
+        localStorage.setItem(`crm-prospecting-run:${currentUser.id}`, startPayload.runId);
+
+        for (let poll = 0; poll < 360; poll += 1) {
+          const progressResponse = await fetch(`/api/prospecting/${encodeURIComponent(startPayload.runId)}`, {
+            headers: { Authorization: `Bearer ${accessToken}` },
+          });
+          if (!progressResponse.ok) throw new Error(`No se pudo consultar el progreso (${progressResponse.status}).`);
+          const progress = getDurableProspectingStatus(await progressResponse.json() as unknown);
+          if (!progress) throw new Error("El Workflow devolvió un estado inválido.");
+
+          setStatusText(
+            `Análisis durable: ${progress.enriched + progress.failed} de ${progress.total} procesados` +
+            (progress.totalBatches ? ` · lote ${Math.min(progress.completedBatches + 1, progress.totalBatches)} de ${progress.totalBatches}` : "")
+          );
+
+          if (["completed", "partial", "failed"].includes(progress.status)) {
+            validations = progress.candidates
+              .map(candidate => candidate.validation)
+              .filter((validation): validation is BusinessValidation => validation !== null);
+            localStorage.removeItem(`crm-prospecting-run:${currentUser.id}`);
+            break;
+          }
+
+          if (["errored", "terminated"].includes(progress.workflowStatus)) {
+            throw new Error("El Workflow durable terminó antes de completar todos los lotes.");
+          }
+
+          await new Promise(resolve => setTimeout(resolve, 2000));
         }
+      } catch (durableError) {
+        console.warn("Workflow durable no disponible; se activa el flujo compatible.", durableError);
+      }
+
+      const validatedIds = new Set(validations.map(validation => validation.id));
+      const unresolvedBusinesses = allExtracted.filter(business => !validatedIds.has(business.id));
+      if (!durableRunStarted || unresolvedBusinesses.length > 0) {
+        if (durableRunStarted && unresolvedBusinesses.length > 0) {
+          setStatusText(`Recuperando ${unresolvedBusinesses.length} prospectos pendientes por el flujo alterno...`);
+        }
+        validations.push(...await validateSequentially(unresolvedBusinesses));
       }
 
       setStatusText("Finalizando perfilamiento...");
@@ -526,8 +628,6 @@ export function MapAgent({ currentUser, onLogout, onUserUpdate }: MapAgentProps)
             : `Rastreo finalizado: ${finalResults.length} pymes perfiladas y guardadas automáticamente.`
         );
         
-        const activeKeyword = isCustomKeyword ? customTerm : selectedTerm;
-        const activeZone = usePreset ? selectedPreset : customLocation;
         await databaseService.logActivity(
           currentUser.id, 
           currentUser.email, 
@@ -998,7 +1098,8 @@ export function MapAgent({ currentUser, onLogout, onUserUpdate }: MapAgentProps)
 
         {/* Tab 2: Lead CRM */}
         {activeTab === "crm" && (
-          <LeadCRM 
+          <ProfessionalCRM
+            currentUser={currentUser}
             leads={crmLeads}
             onUpdateLead={handleUpdateLead}
             onRemoveLead={handleRemoveLead}
