@@ -9,11 +9,13 @@ import {
   readBoundedJson,
 } from "../../../lib/server/security";
 import { normalizeBusiness, type BusinessInput } from "../validate-businesses";
-import type { ProspectingWorkflowParams } from "../../../workflows/ProspectingWorkflow";
+import {
+  PROSPECTING_BATCH_SIZE,
+  type ProspectingWorkflowParams,
+} from "../../../workflows/ProspectingWorkflow";
 
 const MAX_REQUEST_BYTES = 768 * 1024;
 const MAX_BUSINESSES = 200;
-const BATCH_SIZE = 10;
 
 function asRecord(value: unknown): Record<string, unknown> | null {
   return typeof value === "object" && value !== null && !Array.isArray(value)
@@ -64,7 +66,7 @@ async function createRunWithUserSession(
       p_sector: input.sector,
       p_candidates: input.businesses,
       p_workflow_token_hash: input.workflowTokenHash,
-      p_total_batches: Math.ceil(input.businesses.length / BATCH_SIZE),
+      p_total_batches: Math.ceil(input.businesses.length / PROSPECTING_BATCH_SIZE),
     }),
     signal: AbortSignal.timeout(15_000),
   });
@@ -133,7 +135,13 @@ export const POST: APIRoute = async ({ request }) => {
     });
 
     console.log(JSON.stringify({ event: "prospecting_workflow_started", runId, userId: user.id, total: businesses.length }));
-    return jsonResponse({ runId, status: "queued", total: businesses.length }, 202, { "Retry-After": "2" });
+    return jsonResponse({
+      runId,
+      status: "queued",
+      total: businesses.length,
+      batchSize: PROSPECTING_BATCH_SIZE,
+      totalBatches: Math.ceil(businesses.length / PROSPECTING_BATCH_SIZE),
+    }, 202, { "Retry-After": "2" });
   } catch (error) {
     console.error(JSON.stringify({
       event: "prospecting_workflow_start_failed",

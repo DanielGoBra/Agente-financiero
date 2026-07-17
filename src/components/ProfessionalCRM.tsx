@@ -2,7 +2,9 @@ import React, { useEffect, useMemo, useState } from "react";
 import {
   Activity,
   AlertCircle,
+  ArrowRight,
   BriefcaseBusiness,
+  Building2,
   CalendarClock,
   Check,
   ChevronRight,
@@ -19,6 +21,7 @@ import {
   Plus,
   RefreshCw,
   Search,
+  Sparkles,
   Target,
   UserRound,
   UsersRound,
@@ -47,9 +50,11 @@ interface ProfessionalCRMProps {
   leads: ValidatedBusiness[];
   onUpdateLead: (lead: ValidatedBusiness) => void | Promise<void>;
   onRemoveLead: (id: string) => void | Promise<void>;
+  onGoToSearch?: () => void;
 }
 
 type ViewMode = "kanban" | "list";
+type DetailTab = "summary" | "activity";
 
 const PRIORITY_LABELS: Record<CRMPriority, string> = {
   low: "Baja",
@@ -100,13 +105,14 @@ function priorityClass(priority: CRMPriority): string {
   return "bg-teal-50 text-teal-700 border-teal-200";
 }
 
-export function ProfessionalCRM({ currentUser, leads, onUpdateLead, onRemoveLead }: ProfessionalCRMProps) {
+export function ProfessionalCRM({ currentUser, leads, onUpdateLead, onRemoveLead, onGoToSearch }: ProfessionalCRMProps) {
   const [workspace, setWorkspace] = useState<CRMWorkspace | null>(null);
   const [useLegacyCRM, setUseLegacyCRM] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [reloadKey, setReloadKey] = useState(0);
   const [viewMode, setViewMode] = useState<ViewMode>("kanban");
+  const [detailTab, setDetailTab] = useState<DetailTab>("summary");
   const [pipelineKind, setPipelineKind] = useState<Exclude<CRMPipelineKind, "terminal">>("lead");
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedAccountId, setSelectedAccountId] = useState<string | null>(null);
@@ -188,6 +194,7 @@ export function ProfessionalCRM({ currentUser, leads, onUpdateLead, onRemoveLead
       setContacts([]);
       return;
     }
+    setDetailTab("summary");
     void loadAccountDetails(selectedAccountId);
   }, [selectedAccountId, useLegacyCRM]);
 
@@ -403,21 +410,27 @@ export function ProfessionalCRM({ currentUser, leads, onUpdateLead, onRemoveLead
   }
 
   return (
-    <div className="flex-1 min-h-0 overflow-y-auto xl:overflow-hidden p-4 md:p-5 xl:p-6 font-body">
-      <div className="h-full min-h-0 flex flex-col gap-4">
-        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-          <div>
-            <div className="flex items-center gap-2 mb-1">
-              <span className="section-kicker">CRM operativo</span>
-              <span className="px-2 py-0.5 rounded-full bg-ink-50 border border-ink-100 text-[9px] uppercase tracking-wider font-bold text-ink-700">Lead 360°</span>
+    <div className="flex-1 min-h-0 overflow-y-auto xl:overflow-hidden p-3 md:p-4 xl:p-5 font-body">
+      <div className="h-full min-h-0 flex flex-col gap-3.5">
+        <header className="crm-command-header flex flex-col lg:flex-row lg:items-center justify-between gap-4 px-4 py-3.5 md:px-5">
+          <div className="flex items-center gap-3.5 min-w-0">
+            <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-slate-950 to-teal-800 text-white flex items-center justify-center shadow-lg shadow-teal-950/10 flex-shrink-0">
+              <Building2 size={21} strokeWidth={1.8} />
             </div>
-            <h2 className="text-2xl font-bold text-slate-900">Centro de ventas</h2>
-            <p className="text-xs text-slate-400 mt-1">Gestiona prioridades, próximas acciones y conversaciones desde un solo lugar.</p>
+            <div className="min-w-0">
+              <div className="flex items-center gap-2">
+                <h2 className="text-lg md:text-xl font-semibold tracking-tight text-slate-950">Pipeline comercial</h2>
+                <span className="hidden sm:inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-teal-50 border border-teal-100 text-[9px] font-bold text-teal-700">
+                  <Sparkles size={10} /> Vista 360°
+                </span>
+              </div>
+              <p className="text-[11px] text-slate-500 mt-0.5 truncate">Prioriza cuentas, organiza seguimientos y registra cada conversación.</p>
+            </div>
           </div>
           <div className="flex items-center gap-2">
             <button
               onClick={() => exportToExcel(leads, `Pipeline_CRM_${new Date().toISOString().split("T")[0]}.xlsx`)}
-              className="secondary-action px-3.5 py-2.5 rounded-xl text-xs flex items-center gap-2"
+              className="secondary-action px-3.5 py-2.5 rounded-xl text-[11px] font-semibold flex items-center gap-2"
             >
               <FileSpreadsheet size={14} /> Exportar
             </button>
@@ -425,7 +438,7 @@ export function ProfessionalCRM({ currentUser, leads, onUpdateLead, onRemoveLead
               <RefreshCw size={15} />
             </button>
           </div>
-        </div>
+        </header>
 
         {error && (
           <div className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 flex items-start gap-3 text-xs text-rose-700">
@@ -435,25 +448,43 @@ export function ProfessionalCRM({ currentUser, leads, onUpdateLead, onRemoveLead
           </div>
         )}
 
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        {workspace.accounts.length === 0 ? (
+          <div className="flex-1 min-h-[460px] crm-empty-state flex items-center justify-center p-6">
+            <div className="max-w-md text-center">
+              <div className="w-16 h-16 rounded-3xl bg-gradient-to-br from-teal-50 to-cyan-50 border border-teal-100 flex items-center justify-center mx-auto shadow-sm">
+                <BriefcaseBusiness size={28} className="text-teal-700" strokeWidth={1.6} />
+              </div>
+              <p className="text-[10px] font-bold tracking-[0.16em] uppercase text-teal-700 mt-5">Tu espacio comercial está listo</p>
+              <h3 className="text-xl font-semibold tracking-tight text-slate-950 mt-2">Convierte prospectos en oportunidades</h3>
+              <p className="text-sm leading-relaxed text-slate-500 mt-2">Realiza una búsqueda, guarda las empresas que quieras gestionar y aquí aparecerá su pipeline, próximas acciones e historial.</p>
+              {onGoToSearch && (
+                <button onClick={onGoToSearch} className="primary-action mt-5 px-5 py-3 rounded-xl text-xs font-semibold inline-flex items-center gap-2">
+                  Buscar prospectos <ArrowRight size={14} />
+                </button>
+              )}
+            </div>
+          </div>
+        ) : (
+          <>
+        <div className="crm-metrics-strip grid grid-cols-2 lg:grid-cols-4">
           {[
-            { label: "Cartera activa", value: activeAccounts, hint: "empresas en gestión", icon: BriefcaseBusiness, tone: "text-ink-700 bg-ink-50" },
-            { label: "Tareas abiertas", value: pendingTasks.length, hint: "próximas acciones", icon: CalendarClock, tone: "text-blue-700 bg-blue-50" },
-            { label: "Vencidas", value: overdueTasks.length, hint: "requieren atención", icon: Clock3, tone: overdueTasks.length ? "text-rose-700 bg-rose-50" : "text-slate-600 bg-slate-50" },
-            { label: "Sin próxima acción", value: accountsWithoutAction, hint: "leads por organizar", icon: Target, tone: accountsWithoutAction ? "text-amber-700 bg-amber-50" : "text-slate-600 bg-slate-50" },
+            { label: "Cartera activa", value: activeAccounts, hint: "empresas", icon: BriefcaseBusiness, tone: "text-teal-700 bg-teal-50" },
+            { label: "Tareas abiertas", value: pendingTasks.length, hint: "seguimientos", icon: CalendarClock, tone: "text-blue-700 bg-blue-50" },
+            { label: "Vencidas", value: overdueTasks.length, hint: "por atender", icon: Clock3, tone: overdueTasks.length ? "text-rose-700 bg-rose-50" : "text-slate-600 bg-slate-50" },
+            { label: "Sin siguiente paso", value: accountsWithoutAction, hint: "por organizar", icon: Target, tone: accountsWithoutAction ? "text-amber-700 bg-amber-50" : "text-slate-600 bg-slate-50" },
           ].map(metric => (
-            <div key={metric.label} className="metric-card p-4 flex items-center gap-3 min-h-24">
-              <div className={cn("w-10 h-10 rounded-xl flex items-center justify-center", metric.tone)}><metric.icon size={18} /></div>
-              <div>
-                <p className="text-[9px] uppercase tracking-wider font-bold text-slate-400">{metric.label}</p>
-                <p className="text-2xl font-bold text-slate-900 leading-tight">{metric.value}</p>
-                <p className="text-[10px] text-slate-400">{metric.hint}</p>
+            <div key={metric.label} className="crm-metric px-3.5 py-3 flex items-center gap-3 min-w-0">
+              <div className={cn("w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0", metric.tone)}><metric.icon size={17} strokeWidth={1.8} /></div>
+              <div className="min-w-0">
+                <p className="text-xl font-semibold text-slate-950 leading-none">{metric.value}</p>
+                <p className="text-[10px] font-semibold text-slate-600 mt-1 truncate">{metric.label}</p>
+                <p className="text-[9px] text-slate-400 truncate">{metric.hint}</p>
               </div>
             </div>
           ))}
         </div>
 
-        <div className="surface-subtle rounded-2xl p-3 flex flex-col lg:flex-row gap-3 justify-between">
+        <div className="crm-toolbar rounded-2xl p-2.5 flex flex-col lg:flex-row gap-2.5 justify-between">
           <div className="flex flex-col sm:flex-row gap-2">
             <div className="relative min-w-0 sm:w-72">
               <Search size={15} className="absolute left-3 top-3 text-slate-400" />
@@ -464,9 +495,9 @@ export function ProfessionalCRM({ currentUser, leads, onUpdateLead, onRemoveLead
                 className="control-field pl-9 pr-3 py-2.5 text-xs"
               />
             </div>
-            <div className="flex bg-white border border-slate-200 rounded-xl p-1">
-              <button onClick={() => setPipelineKind("lead")} className={cn("px-3 py-1.5 rounded-lg text-[10px] font-bold", pipelineKind === "lead" ? "bg-ink-700 text-white" : "text-slate-500")}>Captación</button>
-              <button onClick={() => setPipelineKind("opportunity")} className={cn("px-3 py-1.5 rounded-lg text-[10px] font-bold", pipelineKind === "opportunity" ? "bg-ink-700 text-white" : "text-slate-500")}>Oportunidades</button>
+            <div className="flex bg-slate-100/80 rounded-xl p-1">
+              <button onClick={() => setPipelineKind("lead")} className={cn("px-3 py-1.5 rounded-lg text-[10px] font-semibold transition", pipelineKind === "lead" ? "bg-white text-teal-800 shadow-sm" : "text-slate-500")}>Captación</button>
+              <button onClick={() => setPipelineKind("opportunity")} className={cn("px-3 py-1.5 rounded-lg text-[10px] font-semibold transition", pipelineKind === "opportunity" ? "bg-white text-teal-800 shadow-sm" : "text-slate-500")}>Oportunidades</button>
             </div>
           </div>
           <div className="flex bg-white border border-slate-200 rounded-xl p-1 self-start">
@@ -476,14 +507,14 @@ export function ProfessionalCRM({ currentUser, leads, onUpdateLead, onRemoveLead
         </div>
 
         <div className="flex-1 min-h-[520px] xl:min-h-0 flex flex-col xl:flex-row gap-4 overflow-visible xl:overflow-hidden">
-          <section className="flex-1 min-w-0 product-panel-raised p-3 overflow-hidden">
+          <section className="flex-1 min-w-0 crm-pipeline-panel p-3 overflow-hidden">
             {viewMode === "kanban" ? (
               <div className="h-full overflow-x-auto custom-scrollbar">
                 <div className="h-full flex gap-3 min-w-max">
                   {visibleStages.map(stage => {
                     const stageAccounts = filteredAccounts.filter(account => account.stageId === stage.id);
                     return (
-                      <div key={stage.id} className="w-72 flex-shrink-0 bg-slate-50/80 border border-slate-100 rounded-2xl p-3 flex flex-col min-h-[430px]">
+                      <div key={stage.id} className="w-64 2xl:w-72 flex-shrink-0 bg-slate-50/75 border border-slate-200/70 rounded-2xl p-3 flex flex-col min-h-[390px]">
                         <div className="flex items-center justify-between mb-3 px-1">
                           <div className="flex items-center gap-2">
                             <CircleDot size={14} className="text-ink-600" />
@@ -521,7 +552,7 @@ export function ProfessionalCRM({ currentUser, leads, onUpdateLead, onRemoveLead
                               </button>
                             );
                           })}
-                          {stageAccounts.length === 0 && <p className="text-[10px] text-slate-400 text-center py-8 border border-dashed border-slate-200 rounded-xl">Sin empresas en esta etapa</p>}
+                          {stageAccounts.length === 0 && <div className="text-center py-8 border border-dashed border-slate-200 rounded-xl bg-white/50"><CircleDot size={18} className="text-slate-300 mx-auto mb-2" /><p className="text-[10px] text-slate-400">Sin empresas</p></div>}
                         </div>
                       </div>
                     );
@@ -555,7 +586,7 @@ export function ProfessionalCRM({ currentUser, leads, onUpdateLead, onRemoveLead
             )}
           </section>
 
-          <aside className="xl:w-[430px] flex-shrink-0 product-panel-raised overflow-hidden flex flex-col min-h-[620px] xl:min-h-0">
+          <aside className="xl:w-[390px] 2xl:w-[420px] flex-shrink-0 crm-detail-panel overflow-hidden flex flex-col min-h-[620px] xl:min-h-0">
             {selectedAccount ? (
               <>
                 <div className="p-5 border-b border-slate-100 bg-gradient-to-br from-white to-ink-50/40">
@@ -587,7 +618,30 @@ export function ProfessionalCRM({ currentUser, leads, onUpdateLead, onRemoveLead
                   </div>
                 </div>
 
+                <div className="grid grid-cols-2 gap-1 p-1.5 mx-4 mt-3 rounded-xl bg-slate-100/80">
+                  <button
+                    onClick={() => setDetailTab("summary")}
+                    className={cn(
+                      "rounded-lg px-3 py-2 text-[10px] font-semibold flex items-center justify-center gap-1.5 transition",
+                      detailTab === "summary" ? "bg-white text-teal-800 shadow-sm" : "text-slate-500"
+                    )}
+                  >
+                    <UserRound size={12} /> Resumen
+                  </button>
+                  <button
+                    onClick={() => setDetailTab("activity")}
+                    className={cn(
+                      "rounded-lg px-3 py-2 text-[10px] font-semibold flex items-center justify-center gap-1.5 transition",
+                      detailTab === "activity" ? "bg-white text-teal-800 shadow-sm" : "text-slate-500"
+                    )}
+                  >
+                    <Activity size={12} /> Actividad
+                  </button>
+                </div>
+
                 <div className="flex-1 overflow-y-auto custom-scrollbar p-5 space-y-6">
+                  {detailTab === "summary" ? (
+                    <>
                   <section>
                     <div className="flex items-center justify-between mb-3"><h4 className="text-xs font-bold text-slate-800 flex items-center gap-2"><UserRound size={14} className="text-ink-600" /> Contactabilidad</h4></div>
                     <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-1 gap-2">
@@ -618,7 +672,6 @@ export function ProfessionalCRM({ currentUser, leads, onUpdateLead, onRemoveLead
                       <button disabled={actionBusy || !taskTitle.trim()} className="primary-action w-full py-2 rounded-lg text-[10px] flex justify-center items-center gap-1.5"><Plus size={12} /> Crear tarea</button>
                     </form>
                   </section>
-
                   <section>
                     <div className="flex items-center justify-between mb-3"><h4 className="text-xs font-bold text-slate-800 flex items-center gap-2"><UsersRound size={14} className="text-violet-600" /> Contactos</h4><span className="text-[9px] font-bold text-slate-400">{contacts.length}</span></div>
                     <div className="space-y-2 mb-3">
@@ -635,7 +688,8 @@ export function ProfessionalCRM({ currentUser, leads, onUpdateLead, onRemoveLead
                       <button disabled={actionBusy || !contactName.trim() || (!contactPhone.trim() && !contactEmail.trim())} className="secondary-action w-full py-2 rounded-lg text-[10px] flex justify-center items-center gap-1.5"><Plus size={12} /> Añadir contacto</button>
                     </form>
                   </section>
-
+                    </>
+                  ) : (
                   <section>
                     <h4 className="text-xs font-bold text-slate-800 flex items-center gap-2 mb-3"><Activity size={14} className="text-ink-600" /> Línea de tiempo</h4>
                     <form onSubmit={handleCreateActivity} className="surface-subtle rounded-xl p-3 space-y-2 mb-4">
@@ -656,6 +710,7 @@ export function ProfessionalCRM({ currentUser, leads, onUpdateLead, onRemoveLead
                       </div>
                     )}
                   </section>
+                  )}
                 </div>
               </>
             ) : (
@@ -667,6 +722,8 @@ export function ProfessionalCRM({ currentUser, leads, onUpdateLead, onRemoveLead
             )}
           </aside>
         </div>
+          </>
+        )}
       </div>
     </div>
   );

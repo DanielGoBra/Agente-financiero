@@ -5,8 +5,9 @@
 El enriquecimiento de prospectos deja de depender de una única petición HTTP.
 Cada búsqueda crea una ejecución de Cloudflare Workflows que:
 
-- divide los prospectos en lotes de diez;
-- reintenta temporalmente OpenRouter con backoff exponencial;
+- divide los prospectos en minilotes de cuatro para evitar respuestas truncadas;
+- prueba hasta tres modelos gratuitos de forma explícita y conserva respuestas parciales;
+- limita cada intento a 80 segundos y evita esperas exponenciales prolongadas;
 - persiste cada lote en Supabase antes de avanzar;
 - conserva resultados exitosos aunque otro lote falle;
 - expone progreso por ejecución al usuario;

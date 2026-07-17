@@ -437,6 +437,77 @@ textarea {
   transform: translateY(-2px);
 }
 
+/* CRM workspace: one clear hierarchy instead of a grid of competing cards. */
+.crm-command-header,
+.crm-metrics-strip,
+.crm-toolbar,
+.crm-pipeline-panel,
+.crm-detail-panel,
+.crm-empty-state {
+  background: rgba(255, 255, 255, 0.94);
+  border: 1px solid rgba(226, 232, 240, 0.86);
+  box-shadow: 0 10px 30px rgba(15, 23, 42, 0.055);
+}
+
+.crm-command-header,
+.crm-metrics-strip,
+.crm-toolbar,
+.crm-pipeline-panel,
+.crm-detail-panel {
+  border-radius: 1.15rem;
+}
+
+.crm-command-header {
+  background:
+    radial-gradient(circle at 8% 0%, rgba(20, 184, 166, 0.08), transparent 30%),
+    rgba(255, 255, 255, 0.96);
+}
+
+.crm-metrics-strip {
+  overflow: hidden;
+}
+
+.crm-metric {
+  position: relative;
+}
+
+.crm-metric:not(:last-child)::after {
+  position: absolute;
+  content: "";
+  top: 0.8rem;
+  right: 0;
+  bottom: 0.8rem;
+  width: 1px;
+  background: #e9eef5;
+}
+
+.crm-toolbar {
+  background: rgba(248, 250, 252, 0.82);
+  box-shadow: 0 4px 16px rgba(15, 23, 42, 0.035);
+}
+
+.crm-pipeline-panel,
+.crm-detail-panel {
+  box-shadow: 0 14px 36px rgba(15, 23, 42, 0.065);
+}
+
+.crm-empty-state {
+  border-radius: 1.5rem;
+  background:
+    radial-gradient(circle at 50% 25%, rgba(20, 184, 166, 0.09), transparent 30%),
+    rgba(255, 255, 255, 0.96);
+}
+
+@media (max-width: 1023px) {
+  .crm-metric:nth-child(2)::after {
+    display: none;
+  }
+
+  .crm-metric:nth-child(-n + 2) {
+    border-bottom: 1px solid #e9eef5;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   html {
     scroll-behavior: auto;

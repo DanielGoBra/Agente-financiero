@@ -118,6 +118,14 @@ interface DurableProspectingStatus {
   candidates: DurableProspectingCandidate[];
 }
 
+interface ProspectingProgress {
+  processed: number;
+  total: number;
+  currentBatch: number;
+  totalBatches: number;
+  phase: "queued" | "analyzing" | "recovering" | "completed";
+}
+
 function getApiError(value: unknown): string | null {
   if (typeof value !== "object" || value === null) return null;
   const error = (value as Record<string, unknown>).error;
@@ -232,6 +240,7 @@ export function MapAgent({ currentUser, onLogout, onUserUpdate }: MapAgentProps)
   // Business State
   const [isExtracting, setIsExtracting] = useState(false);
   const [statusText, setStatusText] = useState("");
+  const [prospectingProgress, setProspectingProgress] = useState<ProspectingProgress | null>(null);
   const [results, setResults] = useState<ValidatedBusiness[]>([]);
   const [selectedBiz, setSelectedBiz] = useState<ValidatedBusiness | null>(null);
   const [error, setError] = useState("");
@@ -334,6 +343,7 @@ export function MapAgent({ currentUser, onLogout, onUserUpdate }: MapAgentProps)
     setError("");
     setResults([]);
     setSelectedBiz(null);
+    setProspectingProgress(null);
 
     // Fetch existing portfolio clients from database for this search zone
     const searchedZone = usePreset ? selectedPreset : customLocation;
@@ -488,8 +498,8 @@ export function MapAgent({ currentUser, onLogout, onUserUpdate }: MapAgentProps)
       let validations: BusinessValidation[] = [];
       // This is a per-request size, not a total-results limit. Smaller outputs
       // avoid truncated JSON while the loop continues through every prospect.
-      const chunkSize = 20;
-      const delayBetweenBatchesMs = 3250;
+      const chunkSize = 4;
+      const delayBetweenBatchesMs = 1500;
       const accessToken = await authService.getAccessToken();
       if (!accessToken) {
         throw new Error("Tu sesión expiró. Inicia sesión nuevamente para continuar.");
@@ -549,10 +559,20 @@ export function MapAgent({ currentUser, onLogout, onUserUpdate }: MapAgentProps)
           throw new Error(getApiError(startError) || `No se pudo iniciar el Workflow (${startResponse.status}).`);
         }
 
-        const startPayload = await startResponse.json() as { runId?: unknown };
+        const startPayload = await startResponse.json() as {
+          runId?: unknown;
+          totalBatches?: unknown;
+        };
         if (typeof startPayload.runId !== "string") throw new Error("El Workflow no devolvió un identificador válido.");
         durableRunStarted = true;
         localStorage.setItem(`crm-prospecting-run:${currentUser.id}`, startPayload.runId);
+        setProspectingProgress({
+          processed: 0,
+          total: allExtracted.length,
+          currentBatch: 1,
+          totalBatches: Number(startPayload.totalBatches || 1),
+          phase: "queued",
+        });
 
         for (let poll = 0; poll < 360; poll += 1) {
           const progressResponse = await fetch(`/api/prospecting/${encodeURIComponent(startPayload.runId)}`, {
@@ -562,9 +582,23 @@ export function MapAgent({ currentUser, onLogout, onUserUpdate }: MapAgentProps)
           const progress = getDurableProspectingStatus(await progressResponse.json() as unknown);
           if (!progress) throw new Error("El Workflow devolvió un estado inválido.");
 
+          const processed = progress.enriched + progress.failed;
+          const currentBatch = progress.totalBatches
+            ? Math.min(progress.completedBatches + 1, progress.totalBatches)
+            : 1;
+          const waitingForFirstResult = processed === 0 && poll >= 10;
+          setProspectingProgress({
+            processed,
+            total: progress.total,
+            currentBatch,
+            totalBatches: progress.totalBatches,
+            phase: progress.workflowStatus === "queued" ? "queued" : "analyzing",
+          });
           setStatusText(
-            `Análisis durable: ${progress.enriched + progress.failed} de ${progress.total} procesados` +
-            (progress.totalBatches ? ` · lote ${Math.min(progress.completedBatches + 1, progress.totalBatches)} de ${progress.totalBatches}` : "")
+            waitingForFirstResult
+              ? `La IA está probando modelos alternos para el lote ${currentBatch} de ${progress.totalBatches}. Ningún prospecto se perderá.`
+              : `Analizando prospectos: ${processed} de ${progress.total}` +
+                (progress.totalBatches ? ` · lote ${currentBatch} de ${progress.totalBatches}` : "")
           );
 
           if (["completed", "partial", "failed"].includes(progress.status)) {
@@ -572,6 +606,13 @@ export function MapAgent({ currentUser, onLogout, onUserUpdate }: MapAgentProps)
               .map(candidate => candidate.validation)
               .filter((validation): validation is BusinessValidation => validation !== null);
             localStorage.removeItem(`crm-prospecting-run:${currentUser.id}`);
+            setProspectingProgress({
+              processed: progress.total,
+              total: progress.total,
+              currentBatch: progress.totalBatches,
+              totalBatches: progress.totalBatches,
+              phase: "completed",
+            });
             break;
           }
 
@@ -590,6 +631,7 @@ export function MapAgent({ currentUser, onLogout, onUserUpdate }: MapAgentProps)
       if (!durableRunStarted || unresolvedBusinesses.length > 0) {
         if (durableRunStarted && unresolvedBusinesses.length > 0) {
           setStatusText(`Recuperando ${unresolvedBusinesses.length} prospectos pendientes por el flujo alterno...`);
+          setProspectingProgress(current => current ? { ...current, phase: "recovering" } : null);
         }
         validations.push(...await validateSequentially(unresolvedBusinesses));
       }
@@ -929,9 +971,33 @@ export function MapAgent({ currentUser, onLogout, onUserUpdate }: MapAgentProps)
                 </button>
                 
                 {statusText && (
-                  <div className="bg-teal-50/55 border border-teal-100 p-3 rounded-lg text-slate-600 text-[10px] leading-relaxed flex items-start gap-2">
-                    <span className="w-1.5 h-1.5 rounded-full bg-teal-600 animate-ping mt-1 flex-shrink-0" />
-                    <span>{statusText}</span>
+                  <div className="bg-teal-50/55 border border-teal-100 p-3 rounded-xl text-slate-600 text-[10px] leading-relaxed">
+                    <div className="flex items-start gap-2">
+                      <span className={cn(
+                        "w-1.5 h-1.5 rounded-full mt-1 flex-shrink-0",
+                        isExtracting ? "bg-teal-600 animate-pulse" : "bg-emerald-500"
+                      )} />
+                      <span className="font-medium">{statusText}</span>
+                    </div>
+                    {prospectingProgress && prospectingProgress.total > 0 && (
+                      <div className="mt-2.5">
+                        <div className="h-1.5 rounded-full bg-white/90 overflow-hidden border border-teal-100/80">
+                          <div
+                            className={cn(
+                              "h-full rounded-full bg-gradient-to-r from-teal-600 to-cyan-500 transition-[width] duration-500",
+                              prospectingProgress.processed === 0 && isExtracting && "w-1/4 animate-pulse"
+                            )}
+                            style={prospectingProgress.processed > 0
+                              ? { width: `${Math.min(100, Math.round((prospectingProgress.processed / prospectingProgress.total) * 100))}%` }
+                              : undefined}
+                          />
+                        </div>
+                        <div className="mt-1.5 flex items-center justify-between text-[9px] text-slate-400">
+                          <span>{prospectingProgress.phase === "recovering" ? "Recuperación automática" : "Enriquecimiento con IA"}</span>
+                          <span>{prospectingProgress.processed}/{prospectingProgress.total}</span>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )}
                 
@@ -1103,6 +1169,7 @@ export function MapAgent({ currentUser, onLogout, onUserUpdate }: MapAgentProps)
             leads={crmLeads}
             onUpdateLead={handleUpdateLead}
             onRemoveLead={handleRemoveLead}
+            onGoToSearch={() => setActiveTab("search")}
           />
         )}
 

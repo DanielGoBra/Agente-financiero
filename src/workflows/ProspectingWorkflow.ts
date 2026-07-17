@@ -24,7 +24,7 @@ interface PersistedBatchResult {
   model: string;
 }
 
-const BATCH_SIZE = 10;
+export const PROSPECTING_BATCH_SIZE = 4;
 
 export class ProspectingWorkflow extends WorkflowEntrypoint<Cloudflare.Env, ProspectingWorkflowParams> {
   async run(event: WorkflowEvent<ProspectingWorkflowParams>, step: WorkflowStep) {
@@ -33,22 +33,32 @@ export class ProspectingWorkflow extends WorkflowEntrypoint<Cloudflare.Env, Pros
     let enriched = 0;
     let failed = 0;
 
-    for (let offset = 0; offset < businesses.length; offset += BATCH_SIZE) {
-      const batchNumber = Math.floor(offset / BATCH_SIZE) + 1;
-      const batch = businesses.slice(offset, offset + BATCH_SIZE);
+    const totalBatches = Math.ceil(businesses.length / PROSPECTING_BATCH_SIZE);
+
+    for (let offset = 0; offset < businesses.length; offset += PROSPECTING_BATCH_SIZE) {
+      const batchNumber = Math.floor(offset / PROSPECTING_BATCH_SIZE) + 1;
+      const batch = businesses.slice(offset, offset + PROSPECTING_BATCH_SIZE);
       let batchResult: PersistedBatchResult | null = null;
       let failureMessage = "El proveedor de IA agotó sus reintentos.";
+
+      console.log(JSON.stringify({
+        event: "prospecting_batch_started",
+        runId,
+        batchNumber,
+        totalBatches,
+        businesses: batch.length,
+      }));
 
       try {
         batchResult = await step.do(
           `analyze-batch-${batchNumber}`,
           {
             retries: {
-              limit: 5,
-              delay: "30 seconds",
-              backoff: "exponential",
+              limit: 1,
+              delay: "5 seconds",
+              backoff: "constant",
             },
-            timeout: "2 minutes",
+            timeout: "80 seconds",
           },
           async () => {
             try {
@@ -56,6 +66,17 @@ export class ProspectingWorkflow extends WorkflowEntrypoint<Cloudflare.Env, Pros
                 apiKey: this.env.OPENROUTER_API_KEY,
                 models,
                 referer: this.env.APP_URL,
+                onModelAttempt: ({ model, attempt, remaining }) => {
+                  console.log(JSON.stringify({
+                    event: "prospecting_model_attempt",
+                    runId,
+                    batchNumber,
+                    totalBatches,
+                    model,
+                    attempt,
+                    remaining,
+                  }));
+                },
               });
             } catch (error) {
               if (error instanceof AIProviderError && !error.retryable) {
@@ -98,6 +119,15 @@ export class ProspectingWorkflow extends WorkflowEntrypoint<Cloudflare.Env, Pros
 
       enriched += validatedIds.size;
       failed += failedIds.length;
+
+      console.log(JSON.stringify({
+        event: "prospecting_batch_completed",
+        runId,
+        batchNumber,
+        totalBatches,
+        enriched: validatedIds.size,
+        failed: failedIds.length,
+      }));
     }
 
     await step.do(
