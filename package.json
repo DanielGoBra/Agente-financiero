@@ -19,7 +19,7 @@
     "@tailwindcss/vite": "^4.1.14",
     "@vis.gl/react-google-maps": "^1.9.0",
     "@vitejs/plugin-react": "^5.0.4",
-    "astro": "^7.0.9",
+    "astro": "^7.4.3",
     "clsx": "^2.1.1",
     "lucide-react": "^0.546.0",
     "motion": "^12.23.24",
